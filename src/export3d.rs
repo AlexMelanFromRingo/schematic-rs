@@ -1,11 +1,12 @@
 //! 3D export functionality for schematics
 //!
-//! Supports exporting to OBJ format with MTL materials
+//! Supports exporting to OBJ format with MTL materials and optional textures
 
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 use crate::UnifiedSchematic;
+use crate::textures::TextureManager;
 
 /// Block color mapping (approximate Minecraft colors)
 pub fn get_block_color(name: &str) -> (f32, f32, f32) {
@@ -233,8 +234,29 @@ pub fn export_obj<P: AsRef<Path>>(
     hollow: bool,
     skip_air: bool,
 ) -> std::io::Result<()> {
+    export_obj_with_textures(schematic, obj_path, hollow, skip_air, None)
+}
+
+/// Generate OBJ file from schematic with optional textures
+pub fn export_obj_with_textures<P: AsRef<Path>>(
+    schematic: &UnifiedSchematic,
+    obj_path: P,
+    hollow: bool,
+    skip_air: bool,
+    textures: Option<&TextureManager>,
+) -> std::io::Result<()> {
     let obj_path = obj_path.as_ref();
     let mtl_path = obj_path.with_extension("mtl");
+    let use_textures = textures.map(|t| t.has_textures()).unwrap_or(false);
+
+    // Create textures subdirectory if using textures
+    let tex_dir = if use_textures {
+        let dir = obj_path.parent().unwrap_or(Path::new(".")).join("textures");
+        std::fs::create_dir_all(&dir)?;
+        Some(dir)
+    } else {
+        None
+    };
 
     let mut obj_file = std::fs::File::create(obj_path)?;
     let mut mtl_file = std::fs::File::create(&mtl_path)?;
@@ -246,12 +268,22 @@ pub fn export_obj<P: AsRef<Path>>(
     writeln!(obj_file, "mtllib {}", mtl_path.file_name().unwrap().to_string_lossy())?;
     writeln!(obj_file)?;
 
+    // Write UV coordinates for textured cubes (shared for all cubes)
+    if use_textures {
+        writeln!(obj_file, "# Texture coordinates")?;
+        writeln!(obj_file, "vt 0 0")?;
+        writeln!(obj_file, "vt 1 0")?;
+        writeln!(obj_file, "vt 1 1")?;
+        writeln!(obj_file, "vt 0 1")?;
+        writeln!(obj_file)?;
+    }
+
     // Write MTL header
     writeln!(mtl_file, "# Minecraft Block Materials")?;
     writeln!(mtl_file)?;
 
-    // Collect unique materials and write them
-    let mut materials: HashMap<String, (f32, f32, f32)> = HashMap::new();
+    // Collect unique materials
+    let mut materials: HashMap<String, (f32, f32, f32, Option<String>)> = HashMap::new();
 
     for y in 0..schematic.height {
         for z in 0..schematic.length {
@@ -263,7 +295,26 @@ pub fn export_obj<P: AsRef<Path>>(
                     let mat_name = block.display_name().replace([':', '[', ']', '=', ','], "_");
                     if !materials.contains_key(&mat_name) {
                         let color = get_block_color(&block.name);
-                        materials.insert(mat_name.clone(), color);
+
+                        // Try to find texture
+                        let texture_file = if let (Some(tex_mgr), Some(tex_out_dir)) = (textures, &tex_dir) {
+                            if let Some(tex_path) = tex_mgr.get_texture(&block.name) {
+                                // Copy texture to output directory
+                                let tex_name = format!("{}.png", mat_name);
+                                let dest = tex_out_dir.join(&tex_name);
+                                if std::fs::copy(tex_path, &dest).is_ok() {
+                                    Some(format!("textures/{}", tex_name))
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
+                        materials.insert(mat_name.clone(), (color.0, color.1, color.2, texture_file));
                     }
                 }
             }
@@ -271,13 +322,22 @@ pub fn export_obj<P: AsRef<Path>>(
     }
 
     // Write materials to MTL
-    for (name, (r, g, b)) in &materials {
+    for (name, (r, g, b, tex_file)) in &materials {
         writeln!(mtl_file, "newmtl {}", name)?;
         writeln!(mtl_file, "Kd {} {} {}", r, g, b)?;
-        writeln!(mtl_file, "Ka 0.1 0.1 0.1")?;
-        writeln!(mtl_file, "Ks 0.0 0.0 0.0")?;
-        writeln!(mtl_file, "Ns 10.0")?;
+        writeln!(mtl_file, "Ka 0.2 0.2 0.2")?;
+        if tex_file.is_some() {
+            writeln!(mtl_file, "Ks 0.1 0.1 0.1")?;
+            writeln!(mtl_file, "Ns 50.0")?;
+        } else {
+            writeln!(mtl_file, "Ks 0.0 0.0 0.0")?;
+            writeln!(mtl_file, "Ns 10.0")?;
+        }
         writeln!(mtl_file, "d 1.0")?;
+        writeln!(mtl_file, "illum 2")?;
+        if let Some(tex) = tex_file {
+            writeln!(mtl_file, "map_Kd {}", tex)?;
+        }
         writeln!(mtl_file)?;
     }
 
@@ -308,7 +368,7 @@ pub fn export_obj<P: AsRef<Path>>(
 
                     // Write cube vertices and faces
                     let (x, y, z) = (x as f32, y as f32, z as f32);
-                    write_cube(&mut obj_file, x, y, z, vertex_index)?;
+                    write_cube(&mut obj_file, x, y, z, vertex_index, use_textures)?;
                     vertex_index += 8;
                 }
             }
@@ -346,7 +406,7 @@ fn is_exposed(schematic: &UnifiedSchematic, x: u16, y: u16, z: u16) -> bool {
 }
 
 /// Write a cube to OBJ file
-fn write_cube<W: Write>(file: &mut W, x: f32, y: f32, z: f32, vi: u32) -> std::io::Result<()> {
+fn write_cube<W: Write>(file: &mut W, x: f32, y: f32, z: f32, vi: u32, use_textures: bool) -> std::io::Result<()> {
     // 8 vertices of a unit cube
     writeln!(file, "v {} {} {}", x, y, z)?;
     writeln!(file, "v {} {} {}", x + 1.0, y, z)?;
@@ -357,19 +417,35 @@ fn write_cube<W: Write>(file: &mut W, x: f32, y: f32, z: f32, vi: u32) -> std::i
     writeln!(file, "v {} {} {}", x + 1.0, y + 1.0, z + 1.0)?;
     writeln!(file, "v {} {} {}", x, y + 1.0, z + 1.0)?;
 
-    // 6 faces (quads)
-    // Front (z-)
-    writeln!(file, "f {} {} {} {}", vi, vi + 1, vi + 2, vi + 3)?;
-    // Back (z+)
-    writeln!(file, "f {} {} {} {}", vi + 5, vi + 4, vi + 7, vi + 6)?;
-    // Left (x-)
-    writeln!(file, "f {} {} {} {}", vi + 4, vi, vi + 3, vi + 7)?;
-    // Right (x+)
-    writeln!(file, "f {} {} {} {}", vi + 1, vi + 5, vi + 6, vi + 2)?;
-    // Bottom (y-)
-    writeln!(file, "f {} {} {} {}", vi + 4, vi + 5, vi + 1, vi)?;
-    // Top (y+)
-    writeln!(file, "f {} {} {} {}", vi + 3, vi + 2, vi + 6, vi + 7)?;
+    if use_textures {
+        // Faces with texture coordinates (vt indices are 1-4)
+        // Front (z-)
+        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi, vi + 1, vi + 2, vi + 3)?;
+        // Back (z+)
+        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi + 5, vi + 4, vi + 7, vi + 6)?;
+        // Left (x-)
+        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi + 4, vi, vi + 3, vi + 7)?;
+        // Right (x+)
+        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi + 1, vi + 5, vi + 6, vi + 2)?;
+        // Bottom (y-)
+        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi + 4, vi + 5, vi + 1, vi)?;
+        // Top (y+)
+        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi + 3, vi + 2, vi + 6, vi + 7)?;
+    } else {
+        // 6 faces (quads) without textures
+        // Front (z-)
+        writeln!(file, "f {} {} {} {}", vi, vi + 1, vi + 2, vi + 3)?;
+        // Back (z+)
+        writeln!(file, "f {} {} {} {}", vi + 5, vi + 4, vi + 7, vi + 6)?;
+        // Left (x-)
+        writeln!(file, "f {} {} {} {}", vi + 4, vi, vi + 3, vi + 7)?;
+        // Right (x+)
+        writeln!(file, "f {} {} {} {}", vi + 1, vi + 5, vi + 6, vi + 2)?;
+        // Bottom (y-)
+        writeln!(file, "f {} {} {} {}", vi + 4, vi + 5, vi + 1, vi)?;
+        // Top (y+)
+        writeln!(file, "f {} {} {} {}", vi + 3, vi + 2, vi + 6, vi + 7)?;
+    }
 
     Ok(())
 }

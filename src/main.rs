@@ -179,6 +179,14 @@ enum Commands {
         /// Only export visible (exposed) blocks
         #[arg(long)]
         hollow: bool,
+
+        /// Extract and apply textures from Minecraft installation
+        #[arg(short, long)]
+        textures: bool,
+
+        /// Path to Minecraft directory or client.jar (e.g., ~/.minecraft or client.jar)
+        #[arg(short, long)]
+        minecraft: Option<PathBuf>,
     },
 
     /// Export to interactive HTML viewer (Three.js)
@@ -238,7 +246,7 @@ fn main() -> Result<()> {
         Commands::Export { file, output } => cmd_export(&file, &output)?,
         Commands::Materials { file, sort, verbose, limit } => cmd_materials(&file, sort, verbose, limit)?,
         Commands::Layer { file, y, ascii } => cmd_layer(&file, y, ascii)?,
-        Commands::RenderObj { file, output, hollow } => cmd_render_obj(&file, &output, hollow)?,
+        Commands::RenderObj { file, output, hollow, textures, minecraft } => cmd_render_obj(&file, &output, hollow, textures, minecraft.as_deref())?,
         Commands::RenderHtml { file, output, max_blocks } => cmd_render_html(&file, &output, max_blocks)?,
         Commands::Debug { file } => cmd_debug(&file)?,
     }
@@ -776,7 +784,7 @@ fn cmd_layer(file: &PathBuf, y: u16, ascii: bool) -> Result<()> {
     Ok(())
 }
 
-fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool) -> Result<()> {
+fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, use_textures: bool, minecraft_path: Option<&std::path::Path>) -> Result<()> {
     let schem = UnifiedSchematic::load(file)?;
 
     println!("{}", "=== Exporting to OBJ ===".bold().cyan());
@@ -784,16 +792,47 @@ fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool) -> Result<()> 
     println!("  Schematic: {}x{}x{}", schem.width, schem.height, schem.length);
     println!("  Solid blocks: {}", schem.solid_blocks());
     println!("  Hollow mode: {}", if hollow { "yes (only visible faces)" } else { "no (all blocks)" });
+
+    // Try to load textures if requested
+    let textures = if use_textures {
+        println!("  Textures: {}", "loading...".yellow());
+        let tm = schem_tool::textures::TextureManager::from_minecraft_with_path(minecraft_path);
+        match tm {
+            Some(tm) => {
+                println!("  Textures: {} textures loaded", tm.texture_count().to_string().green());
+                Some(tm)
+            }
+            None => {
+                println!("  Textures: {} (Minecraft not found, using colors)", "unavailable".red());
+                if minecraft_path.is_none() {
+                    println!("  {}: Use --minecraft <path> to specify Minecraft directory or client.jar", "Hint".yellow());
+                }
+                None
+            }
+        }
+    } else {
+        println!("  Textures: disabled (use --textures to enable)");
+        None
+    };
     println!();
 
-    schem_tool::export3d::export_obj(&schem, output, hollow, true)?;
+    schem_tool::export3d::export_obj_with_textures(&schem, output, hollow, true, textures.as_ref())?;
 
     let mtl_path = output.with_extension("mtl");
     println!("{}:", "Exported files".green());
     println!("  OBJ: {}", output.display());
     println!("  MTL: {}", mtl_path.display());
+
+    if textures.is_some() {
+        let tex_dir = output.parent().unwrap_or(std::path::Path::new(".")).join("textures");
+        println!("  Textures: {}", tex_dir.display());
+    }
+
     println!();
     println!("Open in: Blender, Windows 3D Viewer, online viewers, etc.");
+    if textures.is_some() {
+        println!("{}: In Blender, ensure the textures folder is in the same directory as the OBJ file.", "Tip".yellow());
+    }
 
     Ok(())
 }

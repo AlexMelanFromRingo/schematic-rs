@@ -5,6 +5,7 @@ pub mod block;
 pub mod error;
 pub mod recipes;
 pub mod export3d;
+pub mod textures;
 
 pub use schematic::Schematic;
 pub use schem::Schem;
