@@ -1,5 +1,6 @@
 pub mod schematic;
 pub mod schem;
+pub mod litematica;
 pub mod block;
 pub mod error;
 pub mod recipes;
@@ -7,6 +8,7 @@ pub mod export3d;
 
 pub use schematic::Schematic;
 pub use schem::Schem;
+pub use litematica::Litematica;
 pub use block::{Block, BlockState};
 pub use error::SchemError;
 
@@ -36,6 +38,8 @@ pub enum SchematicFormat {
     SpongeV2,
     /// Sponge Schematic v3 (.schem)
     SpongeV3,
+    /// Litematica format (.litematic)
+    Litematica,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -220,9 +224,6 @@ impl UnifiedSchematic {
     /// Load schematic from file, auto-detecting format
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, SchemError> {
         let path = path.as_ref();
-        let ext = path.extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
 
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
@@ -241,34 +242,30 @@ impl UnifiedSchematic {
             buf
         };
 
-        match ext.to_lowercase().as_str() {
-            "schematic" => {
-                let schematic: Schematic = fastnbt::from_bytes(&data)?;
-                Ok(schematic.into())
-            }
-            "schem" => {
-                // Try wrapped format first (v3 style with root "Schematic" compound)
-                if let Ok(wrapped) = fastnbt::from_bytes::<schem::SchemWrapper>(&data) {
-                    return Ok(wrapped.schematic.into());
-                }
-                // Then try direct format
-                let schem: Schem = fastnbt::from_bytes(&data)?;
-                Ok(schem.into())
-            }
-            _ => {
-                // Try to detect format from content
-                if let Ok(wrapped) = fastnbt::from_bytes::<schem::SchemWrapper>(&data) {
-                    return Ok(wrapped.schematic.into());
-                }
-                if let Ok(schem) = fastnbt::from_bytes::<Schem>(&data) {
-                    return Ok(schem.into());
-                }
-                if let Ok(schematic) = fastnbt::from_bytes::<Schematic>(&data) {
-                    return Ok(schematic.into());
-                }
-                Err(SchemError::UnknownFormat)
-            }
+        // Try to detect format from content, not just extension
+        // Order matters: try more specific formats first
+
+        // 1. Try Litematica (has "Regions" and "Metadata" fields)
+        if let Ok(lit) = fastnbt::from_bytes::<Litematica>(&data) {
+            return Ok(lit.into());
         }
+
+        // 2. Try Sponge v3 wrapped format (root "Schematic" compound)
+        if let Ok(wrapped) = fastnbt::from_bytes::<schem::SchemWrapper>(&data) {
+            return Ok(wrapped.schematic.into());
+        }
+
+        // 3. Try Sponge v2/v3 direct format
+        if let Ok(schem) = fastnbt::from_bytes::<Schem>(&data) {
+            return Ok(schem.into());
+        }
+
+        // 4. Try legacy .schematic format
+        if let Ok(schematic) = fastnbt::from_bytes::<Schematic>(&data) {
+            return Ok(schematic.into());
+        }
+
+        Err(SchemError::UnknownFormat)
     }
 
     /// Get block at position

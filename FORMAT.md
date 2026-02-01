@@ -7,7 +7,8 @@ This document explains the binary formats used for Minecraft schematics and how 
 1. [NBT (Named Binary Tag)](#nbt-named-binary-tag)
 2. [Legacy .schematic Format](#legacy-schematic-format)
 3. [Sponge Schematic v2/v3 (.schem)](#sponge-schematic-v2v3-schem)
-4. [Implementation Guide](#implementation-guide)
+4. [Litematica Format (.litematic)](#litematica-format-litematic)
+5. [Implementation Guide](#implementation-guide)
 
 ---
 
@@ -329,6 +330,110 @@ def decode_block_data(data, volume):
         Origin: int[3]
     }
 }
+```
+
+---
+
+## Litematica Format (.litematic)
+
+Litematica is a popular mod for creating and managing schematics. It uses a more compact storage format with packed bit arrays.
+
+### Structure
+
+```
+{
+    Version: int                    // Format version (4-6)
+    MinecraftDataVersion: int       // MC data version
+    Metadata: {
+        Name: string
+        Author: string
+        Description: string
+        RegionCount: int
+        TotalBlocks: long
+        TotalVolume: long
+        TimeCreated: long           // Unix timestamp (ms)
+        TimeModified: long
+        EnclosingSize: {x, y, z}    // Bounding box
+    }
+    Regions: {
+        [region_name]: {
+            Position: {x, y, z}
+            Size: {x, y, z}         // Can be negative!
+            BlockStatePalette: [    // List of block states
+                {Name: "minecraft:air"},
+                {Name: "minecraft:stone"},
+                {Name: "minecraft:oak_stairs", Properties: {facing: "north", half: "bottom"}}
+            ]
+            BlockStates: LongArray  // Packed bit storage
+            TileEntities: [...]
+            Entities: [...]
+            PendingBlockTicks: [...]
+        }
+    }
+}
+```
+
+### Packed Bit Storage
+
+Unlike Sponge format (varint), Litematica uses packed bits in a LongArray:
+
+1. Calculate bits per block: `ceil(log2(palette_size))`
+2. Each block index is stored using exactly that many bits
+3. Bits are packed sequentially into 64-bit longs
+
+```python
+def calculate_bits_per_block(palette_size):
+    if palette_size <= 1:
+        return 1
+    return ceil(log2(palette_size))
+
+def decode_packed_array(long_array, bits_per_block, count):
+    result = []
+    mask = (1 << bits_per_block) - 1
+    bit_offset = 0
+
+    for _ in range(count):
+        long_index = bit_offset // 64
+        bit_in_long = bit_offset % 64
+
+        if bit_in_long + bits_per_block <= 64:
+            # Value fits in single long
+            value = (long_array[long_index] >> bit_in_long) & mask
+        else:
+            # Value spans two longs
+            bits_in_first = 64 - bit_in_long
+            bits_in_second = bits_per_block - bits_in_first
+
+            first_part = long_array[long_index] >> bit_in_long
+            second_part = (long_array[long_index + 1] & ((1 << bits_in_second) - 1)) << bits_in_first
+
+            value = (first_part | second_part) & mask
+
+        result.append(value)
+        bit_offset += bits_per_block
+
+    return result
+```
+
+### Block Order
+
+Blocks are stored in YZX order (same as other formats):
+- Index = y * (length * width) + z * width + x
+
+### Negative Sizes
+
+Region sizes can be negative, indicating direction:
+- Positive: blocks go from Position to Position + Size
+- Negative: blocks go from Position + Size + 1 to Position
+
+```python
+def get_global_pos(region_pos, region_size, local_x, local_y, local_z):
+    if region_size.x < 0:
+        gx = region_pos.x + region_size.x + 1 + local_x
+    else:
+        gx = region_pos.x + local_x
+    # Same for y and z
+    return (gx, gy, gz)
 ```
 
 ---

@@ -2,7 +2,10 @@
 
 Fast Minecraft schematic file parser and analyzer written in Rust.
 
-Supports both legacy `.schematic` (MCEdit) and modern `.schem` (Sponge/WorldEdit v2/v3) formats.
+Supports multiple formats:
+- `.schematic` — Legacy MCEdit format
+- `.schem` — Sponge/WorldEdit v2/v3
+- `.litematic` — Litematica mod format
 
 ## Features
 
@@ -139,10 +142,13 @@ schem-tool debug my_build.schem
 | Legacy | `.schematic` | MCEdit format, numeric block IDs |
 | Sponge v2 | `.schem` | WorldEdit format, string block states |
 | Sponge v3 | `.schem` | Latest WorldEdit format |
+| Litematica | `.litematic` | Litematica mod format, packed bit storage |
+
+Format is auto-detected from file content, not extension.
 
 ## Format Documentation
 
-See [FORMAT.md](FORMAT.md) for detailed documentation on NBT, `.schematic`, and `.schem` formats. Useful if you want to understand how to parse these formats from scratch.
+See [FORMAT.md](FORMAT.md) for detailed documentation on NBT, `.schematic`, `.schem`, and `.litematic` formats. Useful if you want to understand how to parse these formats from scratch.
 
 ## Library Usage
 
