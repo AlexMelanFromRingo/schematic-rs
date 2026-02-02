@@ -180,6 +180,10 @@ enum Commands {
         #[arg(long)]
         hollow: bool,
 
+        /// Use greedy meshing to reduce polygon count (10-100x smaller files)
+        #[arg(short, long)]
+        greedy: bool,
+
         /// Extract and apply textures from Minecraft installation
         #[arg(short, long)]
         textures: bool,
@@ -246,7 +250,7 @@ fn main() -> Result<()> {
         Commands::Export { file, output } => cmd_export(&file, &output)?,
         Commands::Materials { file, sort, verbose, limit } => cmd_materials(&file, sort, verbose, limit)?,
         Commands::Layer { file, y, ascii } => cmd_layer(&file, y, ascii)?,
-        Commands::RenderObj { file, output, hollow, textures, minecraft } => cmd_render_obj(&file, &output, hollow, textures, minecraft.as_deref())?,
+        Commands::RenderObj { file, output, hollow, greedy, textures, minecraft } => cmd_render_obj(&file, &output, hollow, greedy, textures, minecraft.as_deref())?,
         Commands::RenderHtml { file, output, max_blocks } => cmd_render_html(&file, &output, max_blocks)?,
         Commands::Debug { file } => cmd_debug(&file)?,
     }
@@ -784,14 +788,19 @@ fn cmd_layer(file: &PathBuf, y: u16, ascii: bool) -> Result<()> {
     Ok(())
 }
 
-fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, use_textures: bool, minecraft_path: Option<&std::path::Path>) -> Result<()> {
+fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, greedy: bool, use_textures: bool, minecraft_path: Option<&std::path::Path>) -> Result<()> {
     let schem = UnifiedSchematic::load(file)?;
 
     println!("{}", "=== Exporting to OBJ ===".bold().cyan());
     println!();
     println!("  Schematic: {}x{}x{}", schem.width, schem.height, schem.length);
     println!("  Solid blocks: {}", schem.solid_blocks());
-    println!("  Hollow mode: {}", if hollow { "yes (only visible faces)" } else { "no (all blocks)" });
+
+    if greedy {
+        println!("  Mode: {} (optimized polygon count)", "greedy meshing".green());
+    } else {
+        println!("  Hollow mode: {}", if hollow { "yes (only visible faces)" } else { "no (all blocks)" });
+    }
 
     // Try to load textures if requested
     let textures = if use_textures {
@@ -816,9 +825,14 @@ fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, use_textures: 
     };
     println!();
 
-    schem_tool::export3d::export_obj_with_textures(&schem, output, hollow, true, textures.as_ref())?;
+    if greedy {
+        schem_tool::export3d::export_obj_greedy(&schem, output, textures.as_ref())?;
+    } else {
+        schem_tool::export3d::export_obj_with_textures(&schem, output, hollow, true, textures.as_ref())?;
+    }
 
     let mtl_path = output.with_extension("mtl");
+    println!();
     println!("{}:", "Exported files".green());
     println!("  OBJ: {}", output.display());
     println!("  MTL: {}", mtl_path.display());
