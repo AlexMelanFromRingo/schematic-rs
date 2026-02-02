@@ -3,8 +3,9 @@
 //! Supports exporting to OBJ format with MTL materials and optional textures
 
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::Path;
+use indicatif::{ProgressBar, ProgressStyle};
 use crate::UnifiedSchematic;
 use crate::textures::TextureManager;
 
@@ -227,6 +228,19 @@ pub fn get_block_color(name: &str) -> (f32, f32, f32) {
     }
 }
 
+/// Create a progress bar with consistent styling
+fn create_progress_bar(total: u64, message: &str) -> ProgressBar {
+    let pb = ProgressBar::new(total);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{msg} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {elapsed_precise}")
+            .unwrap()
+            .progress_chars("=>-")
+    );
+    pb.set_message(message.to_string());
+    pb
+}
+
 /// Generate OBJ file from schematic
 pub fn export_obj<P: AsRef<Path>>(
     schematic: &UnifiedSchematic,
@@ -258,8 +272,9 @@ pub fn export_obj_with_textures<P: AsRef<Path>>(
         None
     };
 
-    let mut obj_file = std::fs::File::create(obj_path)?;
-    let mut mtl_file = std::fs::File::create(&mtl_path)?;
+    // Use BufWriter for much faster I/O (critical optimization!)
+    let mut obj_file = BufWriter::with_capacity(1024 * 1024, std::fs::File::create(obj_path)?);
+    let mut mtl_file = BufWriter::with_capacity(64 * 1024, std::fs::File::create(&mtl_path)?);
 
     // Write OBJ header
     writeln!(obj_file, "# Minecraft Schematic Export")?;
@@ -282,12 +297,21 @@ pub fn export_obj_with_textures<P: AsRef<Path>>(
     writeln!(mtl_file, "# Minecraft Block Materials")?;
     writeln!(mtl_file)?;
 
-    // Collect unique materials
+    // Phase 1: Collect unique materials
+    let total_positions = schematic.width as u64 * schematic.height as u64 * schematic.length as u64;
+    let pb = create_progress_bar(total_positions, "Collecting materials");
+
     let mut materials: HashMap<String, (f32, f32, f32, Option<String>)> = HashMap::new();
+    let mut processed = 0u64;
 
     for y in 0..schematic.height {
         for z in 0..schematic.length {
             for x in 0..schematic.width {
+                processed += 1;
+                if processed % 100_000 == 0 {
+                    pb.set_position(processed);
+                }
+
                 if let Some(block) = schematic.get_block(x, y, z) {
                     if skip_air && block.is_air() {
                         continue;
@@ -320,6 +344,7 @@ pub fn export_obj_with_textures<P: AsRef<Path>>(
             }
         }
     }
+    pb.finish_with_message(format!("Found {} unique materials", materials.len()));
 
     // Write materials to MTL
     for (name, (r, g, b, tex_file)) in &materials {
@@ -340,21 +365,34 @@ pub fn export_obj_with_textures<P: AsRef<Path>>(
         }
         writeln!(mtl_file)?;
     }
+    mtl_file.flush()?;
 
-    // Generate geometry
+    // Phase 2: Generate geometry with progress bar
+    let pb = create_progress_bar(total_positions, "Generating geometry");
+
     let mut vertex_index = 1u32;
     let mut current_material = String::new();
+    let mut blocks_written = 0u64;
+    processed = 0;
 
-    for y in 0..schematic.height {
-        for z in 0..schematic.length {
-            for x in 0..schematic.width {
+    // Pre-calculate dimensions for faster bounds checking
+    let (w, h, l) = (schematic.width, schematic.height, schematic.length);
+
+    for y in 0..h {
+        for z in 0..l {
+            for x in 0..w {
+                processed += 1;
+                if processed % 100_000 == 0 {
+                    pb.set_position(processed);
+                }
+
                 if let Some(block) = schematic.get_block(x, y, z) {
                     if skip_air && block.is_air() {
                         continue;
                     }
 
-                    // Check if block is visible (for hollow mode)
-                    if hollow && !is_exposed(schematic, x, y, z) {
+                    // Check if block is visible (for hollow mode) - optimized version
+                    if hollow && !is_exposed_fast(schematic, x, y, z, w, h, l) {
                         continue;
                     }
 
@@ -367,84 +405,119 @@ pub fn export_obj_with_textures<P: AsRef<Path>>(
                     }
 
                     // Write cube vertices and faces
-                    let (x, y, z) = (x as f32, y as f32, z as f32);
-                    write_cube(&mut obj_file, x, y, z, vertex_index, use_textures)?;
+                    write_cube(&mut obj_file, x as f32, y as f32, z as f32, vertex_index, use_textures)?;
                     vertex_index += 8;
+                    blocks_written += 1;
                 }
             }
         }
     }
 
+    pb.finish_with_message(format!("Written {} blocks", blocks_written));
+
+    // Ensure all data is flushed to disk
+    obj_file.flush()?;
+
     Ok(())
 }
 
-/// Check if a block is exposed (has at least one air neighbor)
-fn is_exposed(schematic: &UnifiedSchematic, x: u16, y: u16, z: u16) -> bool {
-    let neighbors = [
-        (x.wrapping_sub(1), y, z),
-        (x + 1, y, z),
-        (x, y.wrapping_sub(1), z),
-        (x, y + 1, z),
-        (x, y, z.wrapping_sub(1)),
-        (x, y, z + 1),
-    ];
+/// Optimized version of is_exposed with pre-calculated bounds
+#[inline]
+fn is_exposed_fast(schematic: &UnifiedSchematic, x: u16, y: u16, z: u16, w: u16, h: u16, l: u16) -> bool {
+    // Check boundaries first (very fast)
+    if x == 0 || x == w - 1 || y == 0 || y == h - 1 || z == 0 || z == l - 1 {
+        return true;
+    }
 
-    for (nx, ny, nz) in neighbors {
-        if nx >= schematic.width || ny >= schematic.height || nz >= schematic.length {
-            return true; // Edge of schematic
-        }
-        if let Some(neighbor) = schematic.get_block(nx, ny, nz) {
-            if neighbor.is_air() {
-                return true;
-            }
-        } else {
-            return true;
-        }
+    // Check each neighbor - early return on first air found
+    // Using direct coordinate access is faster than building an array
+
+    // x-1
+    if let Some(block) = schematic.get_block(x - 1, y, z) {
+        if block.is_air() { return true; }
+    } else {
+        return true;
+    }
+
+    // x+1
+    if let Some(block) = schematic.get_block(x + 1, y, z) {
+        if block.is_air() { return true; }
+    } else {
+        return true;
+    }
+
+    // y-1
+    if let Some(block) = schematic.get_block(x, y - 1, z) {
+        if block.is_air() { return true; }
+    } else {
+        return true;
+    }
+
+    // y+1
+    if let Some(block) = schematic.get_block(x, y + 1, z) {
+        if block.is_air() { return true; }
+    } else {
+        return true;
+    }
+
+    // z-1
+    if let Some(block) = schematic.get_block(x, y, z - 1) {
+        if block.is_air() { return true; }
+    } else {
+        return true;
+    }
+
+    // z+1
+    if let Some(block) = schematic.get_block(x, y, z + 1) {
+        if block.is_air() { return true; }
+    } else {
+        return true;
     }
 
     false
 }
 
-/// Write a cube to OBJ file
+/// Write a cube to OBJ file (optimized with pre-formatted strings)
+#[inline]
 fn write_cube<W: Write>(file: &mut W, x: f32, y: f32, z: f32, vi: u32, use_textures: bool) -> std::io::Result<()> {
-    // 8 vertices of a unit cube
-    writeln!(file, "v {} {} {}", x, y, z)?;
-    writeln!(file, "v {} {} {}", x + 1.0, y, z)?;
-    writeln!(file, "v {} {} {}", x + 1.0, y + 1.0, z)?;
-    writeln!(file, "v {} {} {}", x, y + 1.0, z)?;
-    writeln!(file, "v {} {} {}", x, y, z + 1.0)?;
-    writeln!(file, "v {} {} {}", x + 1.0, y, z + 1.0)?;
-    writeln!(file, "v {} {} {}", x + 1.0, y + 1.0, z + 1.0)?;
-    writeln!(file, "v {} {} {}", x, y + 1.0, z + 1.0)?;
+    // 8 vertices of a unit cube - using write! instead of writeln! for less overhead
+    let x1 = x + 1.0;
+    let y1 = y + 1.0;
+    let z1 = z + 1.0;
+
+    write!(file, "v {} {} {}\nv {} {} {}\nv {} {} {}\nv {} {} {}\nv {} {} {}\nv {} {} {}\nv {} {} {}\nv {} {} {}\n",
+        x, y, z,
+        x1, y, z,
+        x1, y1, z,
+        x, y1, z,
+        x, y, z1,
+        x1, y, z1,
+        x1, y1, z1,
+        x, y1, z1
+    )?;
 
     if use_textures {
-        // Faces with texture coordinates (vt indices are 1-4)
-        // Front (z-)
-        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi, vi + 1, vi + 2, vi + 3)?;
-        // Back (z+)
-        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi + 5, vi + 4, vi + 7, vi + 6)?;
-        // Left (x-)
-        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi + 4, vi, vi + 3, vi + 7)?;
-        // Right (x+)
-        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi + 1, vi + 5, vi + 6, vi + 2)?;
-        // Bottom (y-)
-        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi + 4, vi + 5, vi + 1, vi)?;
-        // Top (y+)
-        writeln!(file, "f {}/1 {}/2 {}/3 {}/4", vi + 3, vi + 2, vi + 6, vi + 7)?;
+        // Faces with texture coordinates
+        write!(file,
+            "f {}/1 {}/2 {}/3 {}/4\nf {}/1 {}/2 {}/3 {}/4\nf {}/1 {}/2 {}/3 {}/4\nf {}/1 {}/2 {}/3 {}/4\nf {}/1 {}/2 {}/3 {}/4\nf {}/1 {}/2 {}/3 {}/4\n",
+            vi, vi + 1, vi + 2, vi + 3,
+            vi + 5, vi + 4, vi + 7, vi + 6,
+            vi + 4, vi, vi + 3, vi + 7,
+            vi + 1, vi + 5, vi + 6, vi + 2,
+            vi + 4, vi + 5, vi + 1, vi,
+            vi + 3, vi + 2, vi + 6, vi + 7
+        )?;
     } else {
         // 6 faces (quads) without textures
-        // Front (z-)
-        writeln!(file, "f {} {} {} {}", vi, vi + 1, vi + 2, vi + 3)?;
-        // Back (z+)
-        writeln!(file, "f {} {} {} {}", vi + 5, vi + 4, vi + 7, vi + 6)?;
-        // Left (x-)
-        writeln!(file, "f {} {} {} {}", vi + 4, vi, vi + 3, vi + 7)?;
-        // Right (x+)
-        writeln!(file, "f {} {} {} {}", vi + 1, vi + 5, vi + 6, vi + 2)?;
-        // Bottom (y-)
-        writeln!(file, "f {} {} {} {}", vi + 4, vi + 5, vi + 1, vi)?;
-        // Top (y+)
-        writeln!(file, "f {} {} {} {}", vi + 3, vi + 2, vi + 6, vi + 7)?;
+        write!(file,
+            "f {} {} {} {}\nf {} {} {} {}\nf {} {} {} {}\nf {} {} {} {}\nf {} {} {} {}\nf {} {} {} {}\n",
+            vi, vi + 1, vi + 2, vi + 3,
+            vi + 5, vi + 4, vi + 7, vi + 6,
+            vi + 4, vi, vi + 3, vi + 7,
+            vi + 1, vi + 5, vi + 6, vi + 2,
+            vi + 4, vi + 5, vi + 1, vi,
+            vi + 3, vi + 2, vi + 6, vi + 7
+        )?;
     }
 
     Ok(())
@@ -456,27 +529,34 @@ pub fn export_html<P: AsRef<Path>>(
     html_path: P,
     max_blocks: usize,
 ) -> std::io::Result<()> {
-    let mut file = std::fs::File::create(html_path)?;
+    let total_positions = schematic.width as u64 * schematic.height as u64 * schematic.length as u64;
+    let pb = create_progress_bar(total_positions.min(max_blocks as u64), "Building HTML data");
 
     // Build block data
-    let mut blocks_json = String::from("[");
-    let mut count = 0;
+    let mut blocks_json = String::with_capacity(max_blocks * 20); // Pre-allocate
+    blocks_json.push('[');
+    let mut count = 0u64;
+    let mut processed = 0u64;
 
-    for y in 0..schematic.height {
-        for z in 0..schematic.length {
-            for x in 0..schematic.width {
+    let (w, h, l) = (schematic.width, schematic.height, schematic.length);
+
+    'outer: for y in 0..h {
+        for z in 0..l {
+            for x in 0..w {
+                processed += 1;
+
                 if let Some(block) = schematic.get_block(x, y, z) {
                     if block.is_air() {
                         continue;
                     }
 
                     // Only include exposed blocks
-                    if !is_exposed(schematic, x, y, z) {
+                    if !is_exposed_fast(schematic, x, y, z, w, h, l) {
                         continue;
                     }
 
-                    if count >= max_blocks {
-                        break;
+                    if count >= max_blocks as u64 {
+                        break 'outer;
                     }
 
                     let (r, g, b) = get_block_color(&block.name);
@@ -489,17 +569,18 @@ pub fn export_html<P: AsRef<Path>>(
                     }
                     blocks_json.push_str(&format!("[{},{},{},{}]", x, y, z, color));
                     count += 1;
+
+                    if count % 10_000 == 0 {
+                        pb.set_position(count);
+                    }
                 }
             }
-            if count >= max_blocks {
-                break;
-            }
-        }
-        if count >= max_blocks {
-            break;
         }
     }
     blocks_json.push(']');
+    pb.finish_with_message(format!("Included {} blocks", count));
+
+    let mut file = BufWriter::new(std::fs::File::create(html_path)?);
 
     let html = format!(r#"<!DOCTYPE html>
 <html>
@@ -619,5 +700,6 @@ pub fn export_html<P: AsRef<Path>>(
     );
 
     file.write_all(html.as_bytes())?;
+    file.flush()?;
     Ok(())
 }
