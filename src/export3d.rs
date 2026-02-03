@@ -257,6 +257,229 @@ fn block_covers_face(block: &crate::Block, face: Face) -> bool {
     block_geometry::block_covers_face(&block.name, &block.state.properties, face)
 }
 
+/// Check if a block is a full cube (can be greedy meshed)
+#[inline]
+fn is_full_block(block: &crate::Block) -> bool {
+    let geom = block_geometry::get_block_geometry(&block.name, &block.state.properties);
+    matches!(geom, block_geometry::BlockGeometry::Full)
+}
+
+/// Information about a partial (non-full) block for mesh generation
+struct PartialBlockInfo {
+    /// World position
+    x: usize,
+    y: usize,
+    z: usize,
+    /// Material name
+    material: String,
+    /// Block geometry (AABBs)
+    geometry: block_geometry::BlockGeometry,
+}
+
+/// Generate quads for a single AABB with face culling
+/// Returns quads with proper vertices and UV coordinates
+fn generate_aabb_quads(
+    aabb: &block_geometry::AABB,
+    x: f32, y: f32, z: f32,
+    material: &str,
+    visible_faces: [bool; 6], // [XNeg, XPos, YNeg, YPos, ZNeg, ZPos]
+) -> Vec<GreedyQuad> {
+    let mut quads = Vec::new();
+
+    let (x0, y0, z0) = (x + aabb.min.0, y + aabb.min.1, z + aabb.min.2);
+    let (x1, y1, z1) = (x + aabb.max.0, y + aabb.max.1, z + aabb.max.2);
+
+    // AABB dimensions for UV scaling
+    let dx = aabb.max.0 - aabb.min.0;
+    let dy = aabb.max.1 - aabb.min.1;
+    let dz = aabb.max.2 - aabb.min.2;
+
+    // XNeg face (-X)
+    if visible_faces[0] {
+        quads.push(GreedyQuad {
+            material: material.to_string(),
+            vertices: [
+                (x0, y0, z0),
+                (x0, y0, z1),
+                (x0, y1, z1),
+                (x0, y1, z0),
+            ],
+            // UV: Z is width, Y is height
+            uv_coords: [(0.0, 0.0), (dz, 0.0), (dz, dy), (0.0, dy)],
+        });
+    }
+
+    // XPos face (+X)
+    if visible_faces[1] {
+        quads.push(GreedyQuad {
+            material: material.to_string(),
+            vertices: [
+                (x1, y0, z1),
+                (x1, y0, z0),
+                (x1, y1, z0),
+                (x1, y1, z1),
+            ],
+            // UV: Z is width (reversed), Y is height
+            uv_coords: [(dz, 0.0), (0.0, 0.0), (0.0, dy), (dz, dy)],
+        });
+    }
+
+    // YNeg face (-Y, bottom)
+    if visible_faces[2] {
+        quads.push(GreedyQuad {
+            material: material.to_string(),
+            vertices: [
+                (x0, y0, z1),
+                (x0, y0, z0),
+                (x1, y0, z0),
+                (x1, y0, z1),
+            ],
+            // UV: X is width, Z is height
+            uv_coords: [(dx, 0.0), (0.0, 0.0), (0.0, dz), (dx, dz)],
+        });
+    }
+
+    // YPos face (+Y, top)
+    if visible_faces[3] {
+        quads.push(GreedyQuad {
+            material: material.to_string(),
+            vertices: [
+                (x0, y1, z0),
+                (x0, y1, z1),
+                (x1, y1, z1),
+                (x1, y1, z0),
+            ],
+            // UV: X is width, Z is height
+            uv_coords: [(0.0, 0.0), (dx, 0.0), (dx, dz), (0.0, dz)],
+        });
+    }
+
+    // ZNeg face (-Z)
+    if visible_faces[4] {
+        quads.push(GreedyQuad {
+            material: material.to_string(),
+            vertices: [
+                (x1, y0, z0),
+                (x0, y0, z0),
+                (x0, y1, z0),
+                (x1, y1, z0),
+            ],
+            // UV: X is width (reversed), Y is height
+            uv_coords: [(dy, 0.0), (0.0, 0.0), (0.0, dx), (dy, dx)],
+        });
+    }
+
+    // ZPos face (+Z)
+    if visible_faces[5] {
+        quads.push(GreedyQuad {
+            material: material.to_string(),
+            vertices: [
+                (x0, y0, z1),
+                (x1, y0, z1),
+                (x1, y1, z1),
+                (x0, y1, z1),
+            ],
+            // UV: X is width, Y is height
+            uv_coords: [(0.0, 0.0), (dy, 0.0), (dy, dx), (0.0, dx)],
+        });
+    }
+
+    quads
+}
+
+/// Determine which faces of an AABB are visible based on neighbors
+fn get_visible_faces_for_aabb(
+    aabb: &block_geometry::AABB,
+    x: usize, y: usize, z: usize,
+    schematic: &UnifiedSchematic,
+    w: usize, h: usize, l: usize,
+) -> [bool; 6] {
+    let mut visible = [true; 6];
+
+    // Helper to check if neighbor fully occludes a face
+    let check_neighbor = |nx: isize, ny: isize, nz: isize, face: Face| -> bool {
+        if nx < 0 || ny < 0 || nz < 0 {
+            return true; // Edge of schematic - visible
+        }
+        let (nx, ny, nz) = (nx as usize, ny as usize, nz as usize);
+        if nx >= w || ny >= h || nz >= l {
+            return true; // Edge of schematic - visible
+        }
+
+        if let Some(neighbor) = schematic.get_block(nx as u16, ny as u16, nz as u16) {
+            if neighbor.is_air() {
+                return true; // Air neighbor - visible
+            }
+
+            let neighbor_geom = block_geometry::get_block_geometry(&neighbor.name, &neighbor.state.properties);
+
+            // If neighbor is a full block, check if our AABB touches the edge
+            if matches!(neighbor_geom, block_geometry::BlockGeometry::Full) {
+                // Full block occludes if our AABB extends to that face
+                let occludes = match face {
+                    Face::XNeg => aabb.min.0 <= 0.001,
+                    Face::XPos => aabb.max.0 >= 0.999,
+                    Face::YNeg => aabb.min.1 <= 0.001,
+                    Face::YPos => aabb.max.1 >= 0.999,
+                    Face::ZNeg => aabb.min.2 <= 0.001,
+                    Face::ZPos => aabb.max.2 >= 0.999,
+                };
+                return !occludes;
+            }
+
+            // For partial neighbors, be conservative - show the face
+            // (proper AABB intersection would be more complex)
+            true
+        } else {
+            true // No block - visible
+        }
+    };
+
+    // Check each direction
+    visible[0] = check_neighbor(x as isize - 1, y as isize, z as isize, Face::XNeg);
+    visible[1] = check_neighbor(x as isize + 1, y as isize, z as isize, Face::XPos);
+    visible[2] = check_neighbor(x as isize, y as isize - 1, z as isize, Face::YNeg);
+    visible[3] = check_neighbor(x as isize, y as isize + 1, z as isize, Face::YPos);
+    visible[4] = check_neighbor(x as isize, y as isize, z as isize - 1, Face::ZNeg);
+    visible[5] = check_neighbor(x as isize, y as isize, z as isize + 1, Face::ZPos);
+
+    visible
+}
+
+/// Generate all quads for a partial block
+fn generate_partial_block_quads(
+    info: &PartialBlockInfo,
+    schematic: &UnifiedSchematic,
+    w: usize, h: usize, l: usize,
+) -> Vec<GreedyQuad> {
+    let mut quads = Vec::new();
+
+    let boxes = info.geometry.get_boxes();
+    let (x, y, z) = (info.x as f32, info.y as f32, info.z as f32);
+
+    for aabb in &boxes {
+        let visible_faces = get_visible_faces_for_aabb(
+            aabb, info.x, info.y, info.z, schematic, w, h, l
+        );
+
+        // Also check internal face culling: if AABB doesn't touch block edge, face is visible
+        let mut actual_visible = visible_faces;
+
+        // If AABB doesn't extend to block edge, that face is always visible (internal face)
+        if aabb.min.0 > 0.001 { actual_visible[0] = true; }
+        if aabb.max.0 < 0.999 { actual_visible[1] = true; }
+        if aabb.min.1 > 0.001 { actual_visible[2] = true; }
+        if aabb.max.1 < 0.999 { actual_visible[3] = true; }
+        if aabb.min.2 > 0.001 { actual_visible[4] = true; }
+        if aabb.max.2 < 0.999 { actual_visible[5] = true; }
+
+        let aabb_quads = generate_aabb_quads(aabb, x, y, z, &info.material, actual_visible);
+        quads.extend(aabb_quads);
+    }
+
+    quads
+}
+
 
 /// Generate OBJ file from schematic (simple per-block cubes)
 pub fn export_obj<P: AsRef<Path>>(
@@ -453,6 +676,7 @@ fn generate_naive_geometry<W: Write>(
 }
 
 /// Generate geometry using greedy meshing algorithm
+/// Full blocks are merged via greedy meshing, partial blocks are rendered individually
 fn generate_greedy_geometry<W: Write>(
     schematic: &UnifiedSchematic,
     obj_file: &mut W,
@@ -460,20 +684,76 @@ fn generate_greedy_geometry<W: Write>(
 ) -> std::io::Result<()> {
     let (w, h, l) = (schematic.width as usize, schematic.height as usize, schematic.length as usize);
 
-    // Collect all quads using greedy meshing
+    // Phase 1: Collect partial blocks for separate processing
+    let total_blocks = (w * h * l) as u64;
+    let pb = create_progress_bar(total_blocks, "Collecting blocks");
+
+    let mut partial_blocks: Vec<PartialBlockInfo> = Vec::new();
+    let mut processed = 0u64;
+
+    for y in 0..h {
+        for z in 0..l {
+            for x in 0..w {
+                processed += 1;
+                if processed % 100_000 == 0 {
+                    pb.set_position(processed);
+                }
+
+                if let Some(block) = schematic.get_block(x as u16, y as u16, z as u16) {
+                    if block.is_air() { continue; }
+
+                    // Check if this is a partial block
+                    let geom = block_geometry::get_block_geometry(&block.name, &block.state.properties);
+                    if !matches!(geom, block_geometry::BlockGeometry::Full) {
+                        let mat_name = block.display_name().replace([':', '[', ']', '=', ','], "_");
+                        partial_blocks.push(PartialBlockInfo {
+                            x, y, z,
+                            material: mat_name,
+                            geometry: geom,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    pb.finish_with_message(format!("Found {} partial blocks", partial_blocks.len()));
+
+    // Phase 2: Greedy mesh full blocks only
     let mut all_quads: Vec<GreedyQuad> = Vec::new();
 
-    let total_slices = (w + h + l) * 2; // Approximate for progress
-    let pb = create_progress_bar(total_slices as u64, "Greedy meshing");
+    let total_slices = (w + h + l) * 2;
+    let pb = create_progress_bar(total_slices as u64, "Greedy meshing full blocks");
     let mut slice_count = 0u64;
 
-    // Process each face direction
     for dir in FaceDir::all() {
-        let quads = greedy_mesh_direction(schematic, dir, w, h, l, &pb, &mut slice_count);
+        let quads = greedy_mesh_direction_full_only(schematic, dir, w, h, l, &pb, &mut slice_count);
         all_quads.extend(quads);
     }
 
-    pb.finish_with_message(format!("Generated {} merged quads", all_quads.len()));
+    let greedy_quad_count = all_quads.len();
+    pb.finish_with_message(format!("Generated {} greedy quads", greedy_quad_count));
+
+    // Phase 3: Generate quads for partial blocks
+    if !partial_blocks.is_empty() {
+        let pb = create_progress_bar(partial_blocks.len() as u64, "Generating partial block meshes");
+
+        for (i, info) in partial_blocks.iter().enumerate() {
+            if i % 1000 == 0 {
+                pb.set_position(i as u64);
+            }
+
+            // Skip empty geometry (air-like blocks)
+            if matches!(info.geometry, block_geometry::BlockGeometry::Empty) {
+                continue;
+            }
+
+            let quads = generate_partial_block_quads(info, schematic, w, h, l);
+            all_quads.extend(quads);
+        }
+
+        let partial_quad_count = all_quads.len() - greedy_quad_count;
+        pb.finish_with_message(format!("Generated {} partial block quads", partial_quad_count));
+    }
 
     // Sort quads by material for efficient rendering
     all_quads.sort_by(|a, b| a.material.cmp(&b.material));
@@ -502,7 +782,6 @@ fn generate_greedy_geometry<W: Write>(
 
         // Write face with UV coordinates
         if use_textures {
-            // Write UV coordinates for this quad (computed per-direction for correct tiling)
             for uv in &quad.uv_coords {
                 writeln!(obj_file, "vt {} {}", uv.0, uv.1)?;
             }
@@ -524,8 +803,9 @@ fn generate_greedy_geometry<W: Write>(
     Ok(())
 }
 
-/// Greedy mesh one direction (e.g., all +Y faces)
-fn greedy_mesh_direction(
+/// Greedy mesh one direction for FULL BLOCKS ONLY
+/// Partial blocks are skipped and handled separately
+fn greedy_mesh_direction_full_only(
     schematic: &UnifiedSchematic,
     dir: FaceDir,
     w: usize, h: usize, l: usize,
@@ -534,22 +814,18 @@ fn greedy_mesh_direction(
 ) -> Vec<GreedyQuad> {
     let mut quads = Vec::new();
 
-    // Determine iteration order based on direction
     let (d1_size, d2_size, slice_count_total) = match dir {
         FaceDir::XNeg | FaceDir::XPos => (h, l, w),
         FaceDir::YNeg | FaceDir::YPos => (w, l, h),
         FaceDir::ZNeg | FaceDir::ZPos => (w, h, l),
     };
 
-    // Process each slice
     for slice_idx in 0..slice_count_total {
         *slice_count += 1;
         if *slice_count % 10 == 0 {
             pb.set_position(*slice_count);
         }
 
-        // Build mask of exposed faces for this slice
-        // mask[d1][d2] = Some(material_name) if face is visible, None otherwise
         let mut mask: Vec<Vec<Option<String>>> = vec![vec![None; d2_size]; d1_size];
 
         for d1 in 0..d1_size {
@@ -568,7 +844,9 @@ fn greedy_mesh_direction(
                 if let Some(block) = schematic.get_block(x as u16, y as u16, z as u16) {
                     if block.is_air() { continue; }
 
-                    // Check if this face is exposed
+                    // SKIP partial blocks - they are handled separately
+                    if !is_full_block(&block) { continue; }
+
                     let neighbor = match dir {
                         FaceDir::XNeg => if x == 0 { None } else { schematic.get_block((x - 1) as u16, y as u16, z as u16) },
                         FaceDir::XPos => schematic.get_block((x + 1) as u16, y as u16, z as u16),
@@ -578,7 +856,6 @@ fn greedy_mesh_direction(
                         FaceDir::ZPos => schematic.get_block(x as u16, y as u16, (z + 1) as u16),
                     };
 
-                    // The neighbor's face that touches us is opposite to our face direction
                     let neighbor_face = match dir {
                         FaceDir::XNeg => Face::XPos,
                         FaceDir::XPos => Face::XNeg,
@@ -601,7 +878,6 @@ fn greedy_mesh_direction(
             }
         }
 
-        // Greedy mesh the mask
         let slice_quads = greedy_mesh_2d(&mask, d1_size, d2_size, slice_idx, dir, w, h, l);
         quads.extend(slice_quads);
     }
