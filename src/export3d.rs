@@ -583,7 +583,8 @@ fn export_obj_internal<P: AsRef<Path>>(
                             if let Some(tex_path) = tex_mgr.get_texture(&block.name) {
                                 let tex_name = format!("{}.png", mat_name);
                                 let dest = tex_out_dir.join(&tex_name);
-                                if std::fs::copy(tex_path, &dest).is_ok() {
+                                // Use copy_texture_with_tint to apply biome colors to leaves/grass
+                                if crate::textures::copy_texture_with_tint(tex_path, &dest, &block.name).is_ok() {
                                     Some(format!("textures/{}", tex_name))
                                 } else { None }
                             } else { None }

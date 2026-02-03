@@ -29,3 +29,6 @@ chrono = "0.4"
 zip = "2"
 dirs = "6"
 indicatif = "0.18.3"
+
+# Image processing (for texture tinting)
+image = "0.25"

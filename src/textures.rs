@@ -7,6 +7,7 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use zip::ZipArchive;
+use image::{GenericImageView, ImageBuffer, Rgba};
 
 /// Get the default Minecraft directory based on OS
 pub fn get_minecraft_dir() -> Option<PathBuf> {
@@ -229,6 +230,68 @@ impl TextureManager {
     /// Get count of loaded textures
     pub fn texture_count(&self) -> usize {
         self.texture_map.len()
+    }
+}
+
+/// Get tint color for a block (if it needs tinting)
+/// Returns (r, g, b) multiplier where 1.0 = no change
+pub fn get_block_tint(block_name: &str) -> Option<(f32, f32, f32)> {
+    let name = block_name.strip_prefix("minecraft:").unwrap_or(block_name);
+
+    // Leaves use foliage color (green tint)
+    // Default foliage color from plains biome
+    if name.contains("leaves") {
+        return Some((0.47, 0.74, 0.34)); // #77BD2F - plains foliage
+    }
+
+    // Grass blocks and grass use grass color
+    if name == "grass_block" || name == "grass" || name == "tall_grass" {
+        return Some((0.57, 0.74, 0.35)); // #91BD59 - plains grass
+    }
+
+    // Vines
+    if name.contains("vine") {
+        return Some((0.47, 0.74, 0.34));
+    }
+
+    // Lily pad
+    if name == "lily_pad" {
+        return Some((0.47, 0.74, 0.34));
+    }
+
+    None
+}
+
+/// Apply tint to an image and save to destination
+/// The tint multiplies each pixel's RGB values
+pub fn apply_tint_and_save(src_path: &Path, dest_path: &Path, tint: (f32, f32, f32)) -> std::io::Result<()> {
+    let img = image::open(src_path)
+        .map_err(|e| std::io::Error::other(format!("Failed to open image: {}", e)))?;
+
+    let (width, height) = img.dimensions();
+    let mut output: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+
+    for (x, y, pixel) in img.pixels() {
+        let [r, g, b, a] = pixel.0;
+        let new_r = ((r as f32 * tint.0).min(255.0)) as u8;
+        let new_g = ((g as f32 * tint.1).min(255.0)) as u8;
+        let new_b = ((b as f32 * tint.2).min(255.0)) as u8;
+        output.put_pixel(x, y, Rgba([new_r, new_g, new_b, a]));
+    }
+
+    output.save(dest_path)
+        .map_err(|e| std::io::Error::other(format!("Failed to save image: {}", e)))?;
+
+    Ok(())
+}
+
+/// Copy texture with optional tinting
+pub fn copy_texture_with_tint(src_path: &Path, dest_path: &Path, block_name: &str) -> std::io::Result<()> {
+    if let Some(tint) = get_block_tint(block_name) {
+        apply_tint_and_save(src_path, dest_path, tint)
+    } else {
+        std::fs::copy(src_path, dest_path)?;
+        Ok(())
     }
 }
 

@@ -136,10 +136,23 @@ pub const PRESSURE_PLATE: AABB = AABB::new((0.0625, 0.0, 0.0625), (0.9375, 0.062
 
 /// Fence post (center)
 pub const FENCE_POST: AABB = AABB::new((0.375, 0.0, 0.375), (0.625, 1.0, 0.625));
+/// Fence connection segments
+pub const FENCE_NORTH: AABB = AABB::new((0.375, 0.375, 0.0), (0.625, 0.9375, 0.375));
+pub const FENCE_SOUTH: AABB = AABB::new((0.375, 0.375, 0.625), (0.625, 0.9375, 1.0));
+pub const FENCE_WEST: AABB = AABB::new((0.0, 0.375, 0.375), (0.375, 0.9375, 0.625));
+pub const FENCE_EAST: AABB = AABB::new((0.625, 0.375, 0.375), (1.0, 0.9375, 0.625));
 
-/// Glass pane / iron bars (center, north-south oriented)
+/// Glass pane / iron bars center post
+pub const PANE_POST: AABB = AABB::new((0.4375, 0.0, 0.4375), (0.5625, 1.0, 0.5625));
+/// Glass pane connection segments
+pub const PANE_NORTH: AABB = AABB::new((0.4375, 0.0, 0.0), (0.5625, 1.0, 0.4375));
+pub const PANE_SOUTH: AABB = AABB::new((0.4375, 0.0, 0.5625), (0.5625, 1.0, 1.0));
+pub const PANE_WEST: AABB = AABB::new((0.0, 0.0, 0.4375), (0.4375, 1.0, 0.5625));
+pub const PANE_EAST: AABB = AABB::new((0.5625, 0.0, 0.4375), (1.0, 1.0, 0.5625));
+
+/// Glass pane / iron bars (center, north-south oriented) - legacy
 pub const PANE_NS: AABB = AABB::new((0.4375, 0.0, 0.0), (0.5625, 1.0, 1.0));
-/// Glass pane / iron bars (center, east-west oriented)
+/// Glass pane / iron bars (center, east-west oriented) - legacy
 pub const PANE_EW: AABB = AABB::new((0.0, 0.0, 0.4375), (1.0, 1.0, 0.5625));
 
 /// Ladder (attached to wall)
@@ -416,21 +429,102 @@ pub fn get_block_geometry(name: &str, properties: &HashMap<String, String>) -> B
         });
     }
 
-    // Fences
-    if name.contains("fence") {
-        // Just the post for now - connections would need neighbor checking
-        return BlockGeometry::Single(FENCE_POST);
+    // Fences (read connection state from properties)
+    if name.contains("fence") && !name.contains("gate") {
+        let mut boxes = vec![FENCE_POST];
+
+        // Check connection properties
+        if properties.get("north").map(|s| s.as_str()) == Some("true") {
+            boxes.push(FENCE_NORTH);
+        }
+        if properties.get("south").map(|s| s.as_str()) == Some("true") {
+            boxes.push(FENCE_SOUTH);
+        }
+        if properties.get("west").map(|s| s.as_str()) == Some("true") {
+            boxes.push(FENCE_WEST);
+        }
+        if properties.get("east").map(|s| s.as_str()) == Some("true") {
+            boxes.push(FENCE_EAST);
+        }
+
+        return if boxes.len() == 1 {
+            BlockGeometry::Single(FENCE_POST)
+        } else {
+            BlockGeometry::Multi(boxes)
+        };
     }
 
-    // Walls
+    // Walls (read connection state from properties)
     if name.contains("wall") && !name.contains("sign") {
-        return BlockGeometry::Single(WALL_POST);
+        let mut boxes = vec![WALL_POST];
+
+        // Walls use "none", "low", "tall" for connections
+        let has_connection = |dir: &str| -> bool {
+            properties.get(dir).map(|s| s != "none").unwrap_or(false)
+        };
+
+        if has_connection("north") {
+            boxes.push(WALL_NORTH);
+        }
+        if has_connection("south") {
+            boxes.push(WALL_SOUTH);
+        }
+        if has_connection("west") {
+            boxes.push(WALL_WEST);
+        }
+        if has_connection("east") {
+            boxes.push(WALL_EAST);
+        }
+
+        return if boxes.len() == 1 {
+            BlockGeometry::Single(WALL_POST)
+        } else {
+            BlockGeometry::Multi(boxes)
+        };
     }
 
-    // Glass panes, iron bars
+    // Glass panes, iron bars (read connection state from properties)
     if name.contains("pane") || name == "iron_bars" {
-        // Simplified - just center post, connections need neighbor info
-        return BlockGeometry::Single(AABB::new((0.4375, 0.0, 0.4375), (0.5625, 1.0, 0.5625)));
+        let north = properties.get("north").map(|s| s.as_str()) == Some("true");
+        let south = properties.get("south").map(|s| s.as_str()) == Some("true");
+        let west = properties.get("west").map(|s| s.as_str()) == Some("true");
+        let east = properties.get("east").map(|s| s.as_str()) == Some("true");
+
+        let mut boxes = Vec::new();
+
+        // If no connections, show just the post
+        if !north && !south && !west && !east {
+            return BlockGeometry::Single(PANE_POST);
+        }
+
+        // Add center post only if connections from multiple sides or corners
+        let connection_count = [north, south, west, east].iter().filter(|&&x| x).count();
+        if connection_count != 2 || (north && south) || (west && east) {
+            // Either 1, 3, 4 connections, or straight line - always need post for non-straight
+            if !(connection_count == 2 && ((north && south) || (west && east))) {
+                boxes.push(PANE_POST);
+            }
+        }
+
+        // Add connection segments
+        if north {
+            boxes.push(PANE_NORTH);
+        }
+        if south {
+            boxes.push(PANE_SOUTH);
+        }
+        if west {
+            boxes.push(PANE_WEST);
+        }
+        if east {
+            boxes.push(PANE_EAST);
+        }
+
+        return if boxes.len() == 1 {
+            BlockGeometry::Single(boxes[0])
+        } else {
+            BlockGeometry::Multi(boxes)
+        };
     }
 
     // Carpets
