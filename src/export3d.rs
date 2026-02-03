@@ -218,6 +218,8 @@ struct GreedyQuad {
     material: String,
     /// Four corner vertices (counter-clockwise)
     vertices: [(f32, f32, f32); 4],
+    /// Size in blocks (width, height) for texture tiling
+    size: (usize, usize),
 }
 
 /// Generate OBJ file from schematic (simple per-block cubes)
@@ -283,7 +285,9 @@ fn export_obj_internal<P: AsRef<Path>>(
     writeln!(obj_file, "mtllib {}", mtl_path.file_name().unwrap().to_string_lossy())?;
     writeln!(obj_file)?;
 
-    if use_textures {
+    // Note: For greedy meshing, UV coordinates are written per-quad
+    // For naive mode, we use fixed 0-1 coordinates
+    if use_textures && !greedy {
         writeln!(obj_file, "# Texture coordinates")?;
         writeln!(obj_file, "vt 0 0")?;
         writeln!(obj_file, "vt 1 0")?;
@@ -440,6 +444,7 @@ fn generate_greedy_geometry<W: Write>(
     let pb = create_progress_bar(all_quads.len() as u64, "Writing OBJ");
 
     let mut vertex_index = 1u32;
+    let mut vt_index = 1u32;
     let mut current_material = String::new();
 
     for (i, quad) in all_quads.iter().enumerate() {
@@ -457,10 +462,21 @@ fn generate_greedy_geometry<W: Write>(
             writeln!(obj_file, "v {} {} {}", v.0, v.1, v.2)?;
         }
 
-        // Write face
+        // Write face with UV coordinates
         if use_textures {
-            writeln!(obj_file, "f {}/1 {}/2 {}/3 {}/4",
-                vertex_index, vertex_index + 1, vertex_index + 2, vertex_index + 3)?;
+            // Write UV coordinates for this quad - tile texture based on quad size
+            let (w, h) = (quad.size.0 as f32, quad.size.1 as f32);
+            writeln!(obj_file, "vt 0 0")?;
+            writeln!(obj_file, "vt {} 0", w)?;
+            writeln!(obj_file, "vt {} {}", w, h)?;
+            writeln!(obj_file, "vt 0 {}", h)?;
+
+            writeln!(obj_file, "f {}/{} {}/{} {}/{} {}/{}",
+                vertex_index, vt_index,
+                vertex_index + 1, vt_index + 1,
+                vertex_index + 2, vt_index + 2,
+                vertex_index + 3, vt_index + 3)?;
+            vt_index += 4;
         } else {
             writeln!(obj_file, "f {} {} {} {}",
                 vertex_index, vertex_index + 1, vertex_index + 2, vertex_index + 3)?;
@@ -602,7 +618,7 @@ fn greedy_mesh_2d(
                 slice_idx, d1, d2, width, height, dir, w, h, l
             );
 
-            quads.push(GreedyQuad { material, vertices });
+            quads.push(GreedyQuad { material, vertices, size: (width, height) });
         }
     }
 

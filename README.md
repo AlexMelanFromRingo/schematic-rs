@@ -15,7 +15,10 @@ Supports multiple formats:
 - **Calculate** raw materials needed (breaks down crafted items)
 - **Extract** sign text and block entity data
 - **Visualize** layer-by-layer ASCII/Unicode view
-- **Export** to OBJ 3D model or interactive HTML viewer
+- **Export** to OBJ 3D model with textures support
+- **Greedy meshing** for dramatically smaller OBJ files (10-100x reduction)
+- **Texture extraction** from Minecraft installation with proper tiling
+- **Interactive HTML viewer** using Three.js
 - **Debug** raw NBT structure
 
 ## Installation
@@ -107,9 +110,31 @@ schem-tool layer my_build.schem -y 10 --ascii
 # Export to OBJ (for Blender, Windows 3D Viewer, etc.)
 schem-tool render-obj my_build.schem -o model.obj --hollow
 
+# Export with greedy meshing (10-100x smaller files, recommended)
+schem-tool render-obj my_build.schem -o model.obj --greedy
+
+# Export with textures from Minecraft installation
+schem-tool render-obj my_build.schem -o model.obj --greedy --textures
+
+# Specify custom Minecraft path or client.jar
+schem-tool render-obj my_build.schem -o model.obj --greedy --textures -m ~/.minecraft
+schem-tool render-obj my_build.schem -o model.obj --textures -m /path/to/client.jar
+
 # Export to interactive HTML viewer
 schem-tool render-html my_build.schem -o view.html -m 100000
 ```
+
+#### Greedy Meshing
+
+The `--greedy` flag enables greedy meshing algorithm that merges adjacent faces of the same block type into larger quads. This dramatically reduces file size and polygon count (typically 10-100x smaller), making models much easier to work with in 3D software.
+
+#### Textures
+
+When using `--textures`, the tool extracts block textures from your Minecraft installation:
+- Auto-detects Minecraft directory on Windows, macOS, and Linux
+- Textures are cached for faster subsequent exports
+- Tiled properly even with greedy meshing (textures repeat instead of stretching)
+- Creates a `textures/` folder next to the OBJ file
 
 ### Other Commands
 ```bash
@@ -193,6 +218,9 @@ Tested on a 491x384x551 schematic (~104 million blocks):
 - `chrono` - Date formatting
 - `colored` - Terminal colors
 - `tabled` - Table formatting
+- `indicatif` - Progress bars
+- `zip` - Texture extraction from Minecraft JAR
+- `dirs` - OS-specific directory detection
 
 ## License
 
