@@ -249,6 +249,101 @@ fn get_block_transparency(name: &str) -> f32 {
     }
 }
 
+/// Check if a block is partial (doesn't fill the entire cube)
+/// These blocks should not occlude adjacent faces
+#[inline]
+fn is_partial_block(name: &str) -> bool {
+    let name = name.strip_prefix("minecraft:").unwrap_or(name);
+
+    // Doors, trapdoors, gates
+    if name.contains("door") || name.contains("gate") || name.contains("trapdoor") {
+        return true;
+    }
+
+    // Stairs, slabs
+    if name.contains("stairs") || name.contains("slab") {
+        return true;
+    }
+
+    // Fences, walls
+    if name.contains("fence") || name.contains("wall") {
+        return true;
+    }
+
+    // Torches, lanterns, candles
+    if name.contains("torch") || name.contains("lantern") || name.contains("candle") {
+        return true;
+    }
+
+    // Rails, redstone components
+    if name.contains("rail") || name.contains("lever") || name.contains("button")
+        || name.contains("pressure_plate") || name.contains("tripwire") {
+        return true;
+    }
+
+    // Plants, crops, flowers
+    if name.contains("flower") || name.contains("grass") && !name.contains("block")
+        || name.contains("fern") || name.contains("sapling") || name.contains("mushroom")
+        || name.contains("crop") || name.contains("wheat") || name.contains("carrot")
+        || name.contains("potato") || name.contains("beetroot") || name.contains("stem")
+        || name.contains("vine") || name.contains("lily") || name.contains("kelp")
+        || name.contains("seagrass") || name.contains("coral") && !name.contains("block")
+        || name.contains("bush") || name.contains("bamboo") && !name.contains("block")
+        || name.contains("sugar_cane") || name.contains("cactus") {
+        return true;
+    }
+
+    // Signs, banners, heads
+    if name.contains("sign") || name.contains("banner") || name.contains("head")
+        || name.contains("skull") {
+        return true;
+    }
+
+    // Beds, carpets
+    if name.contains("bed") || name.contains("carpet") {
+        return true;
+    }
+
+    // Chains, bars, ladders
+    if name.contains("chain") || name.contains("bars") || name.contains("ladder") {
+        return true;
+    }
+
+    // Pots, anvils, bells
+    if name.contains("pot") || name.contains("anvil") || name.contains("bell")
+        || name.contains("cauldron") || name.contains("brewing_stand")
+        || name.contains("enchanting_table") || name.contains("lectern") {
+        return true;
+    }
+
+    // Snow layers (but not snow_block)
+    if name == "snow" {
+        return true;
+    }
+
+    // End rod, lightning rod
+    if name.contains("_rod") {
+        return true;
+    }
+
+    // Panes (glass panes, iron bars already covered)
+    if name.contains("pane") {
+        return true;
+    }
+
+    // Sculk sensors, comparators, repeaters
+    if name.contains("sculk_sensor") || name.contains("comparator") || name.contains("repeater") {
+        return true;
+    }
+
+    // Chests, hoppers (have special shapes)
+    if name.contains("chest") || name.contains("hopper") {
+        return true;
+    }
+
+    false
+}
+
 /// Generate OBJ file from schematic (simple per-block cubes)
 pub fn export_obj<P: AsRef<Path>>(
     schematic: &UnifiedSchematic,
@@ -571,7 +666,7 @@ fn greedy_mesh_direction(
 
                     let is_exposed = match neighbor {
                         None => true,
-                        Some(n) => n.is_air(),
+                        Some(n) => n.is_air() || is_partial_block(&n.name),
                     };
 
                     if is_exposed {
@@ -709,17 +804,23 @@ fn create_quad_vertices(
     }
 }
 
+/// Check if a neighbor block exposes the current block's face
+#[inline]
+fn neighbor_exposes_face(block: &crate::Block) -> bool {
+    block.is_air() || is_partial_block(&block.name)
+}
+
 #[inline]
 fn is_exposed_fast(schematic: &UnifiedSchematic, x: u16, y: u16, z: u16, w: u16, h: u16, l: u16) -> bool {
     if x == 0 || x == w - 1 || y == 0 || y == h - 1 || z == 0 || z == l - 1 {
         return true;
     }
-    if let Some(block) = schematic.get_block(x - 1, y, z) { if block.is_air() { return true; } } else { return true; }
-    if let Some(block) = schematic.get_block(x + 1, y, z) { if block.is_air() { return true; } } else { return true; }
-    if let Some(block) = schematic.get_block(x, y - 1, z) { if block.is_air() { return true; } } else { return true; }
-    if let Some(block) = schematic.get_block(x, y + 1, z) { if block.is_air() { return true; } } else { return true; }
-    if let Some(block) = schematic.get_block(x, y, z - 1) { if block.is_air() { return true; } } else { return true; }
-    if let Some(block) = schematic.get_block(x, y, z + 1) { if block.is_air() { return true; } } else { return true; }
+    if let Some(block) = schematic.get_block(x - 1, y, z) { if neighbor_exposes_face(&block) { return true; } } else { return true; }
+    if let Some(block) = schematic.get_block(x + 1, y, z) { if neighbor_exposes_face(&block) { return true; } } else { return true; }
+    if let Some(block) = schematic.get_block(x, y - 1, z) { if neighbor_exposes_face(&block) { return true; } } else { return true; }
+    if let Some(block) = schematic.get_block(x, y + 1, z) { if neighbor_exposes_face(&block) { return true; } } else { return true; }
+    if let Some(block) = schematic.get_block(x, y, z - 1) { if neighbor_exposes_face(&block) { return true; } } else { return true; }
+    if let Some(block) = schematic.get_block(x, y, z + 1) { if neighbor_exposes_face(&block) { return true; } } else { return true; }
     false
 }
 
