@@ -128,12 +128,37 @@ schem-tool render-html my_build.schem -o view.html -m 100000
 
 The `--greedy` flag enables greedy meshing algorithm that merges adjacent faces of the same block type into larger quads. This dramatically reduces file size and polygon count (typically 10-100x smaller), making models much easier to work with in 3D software.
 
+#### Partial Block Support
+
+Non-full blocks are rendered with correct geometry:
+- **Slabs** — half-height blocks (top/bottom)
+- **Stairs** — proper L-shaped geometry
+- **Doors, trapdoors** — thin panels with correct orientation
+- **Fences, walls** — posts and connections
+- **Torches, lanterns, candles** — small decorative shapes
+- **Beds, carpets** — flat/low-profile shapes
+- **Chests, hoppers, cauldrons** — special container shapes
+- **And many more** — buttons, levers, rails, signs, etc.
+
+Full blocks use efficient greedy meshing, while partial blocks are rendered individually with proper face culling.
+
+#### Transparency
+
+Materials with transparency are exported with correct opacity values:
+- **Glass** — 30% opacity
+- **Leaves** — 90% opacity
+- **Ice** (not packed/blue) — 70% opacity
+- **Water** — 40% opacity
+
+This allows proper rendering in Blender and other 3D software when using transparency-aware materials.
+
 #### Textures
 
 When using `--textures`, the tool extracts block textures from your Minecraft installation:
 - Auto-detects Minecraft directory on Windows, macOS, and Linux
 - Textures are cached for faster subsequent exports
 - Tiled properly even with greedy meshing (textures repeat instead of stretching)
+- UV coordinates scaled correctly for partial blocks (half-texture for slabs, etc.)
 - Creates a `textures/` folder next to the OBJ file
 
 ### Other Commands

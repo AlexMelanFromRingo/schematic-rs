@@ -365,7 +365,7 @@ fn generate_aabb_quads(
                 (x1, y1, z0),
             ],
             // UV: X is width (reversed), Y is height
-            uv_coords: [(dy, 0.0), (0.0, 0.0), (0.0, dx), (dy, dx)],
+            uv_coords: [(dx, 0.0), (0.0, 0.0), (0.0, dy), (dx, dy)],
         });
     }
 
@@ -380,7 +380,7 @@ fn generate_aabb_quads(
                 (x0, y1, z1),
             ],
             // UV: X is width, Y is height
-            uv_coords: [(0.0, 0.0), (dy, 0.0), (dy, dx), (0.0, dx)],
+            uv_coords: [(0.0, 0.0), (dx, 0.0), (dx, dy), (0.0, dy)],
         });
     }
 
