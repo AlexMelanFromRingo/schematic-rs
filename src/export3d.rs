@@ -218,8 +218,35 @@ struct GreedyQuad {
     material: String,
     /// Four corner vertices (counter-clockwise)
     vertices: [(f32, f32, f32); 4],
-    /// Size in blocks (width, height) for texture tiling
-    size: (usize, usize),
+    /// UV coordinates for each vertex (matched to vertex order)
+    uv_coords: [(f32, f32); 4],
+}
+
+/// Get UV coordinates for a quad based on face direction and size
+/// The UV mapping must match the vertex order for each face direction
+fn get_uv_coords(dir: FaceDir, width: usize, height: usize) -> [(f32, f32); 4] {
+    let (w, h) = (width as f32, height as f32);
+    match dir {
+        // These directions have standard UV mapping (0,0) -> (w,0) -> (w,h) -> (0,h)
+        FaceDir::XNeg | FaceDir::YPos => [(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)],
+        // These need swapped U coordinates
+        FaceDir::XPos | FaceDir::YNeg => [(w, 0.0), (0.0, 0.0), (0.0, h), (w, h)],
+        // Z faces have width/height swapped in UV space
+        FaceDir::ZNeg => [(h, 0.0), (0.0, 0.0), (0.0, w), (h, w)],
+        FaceDir::ZPos => [(0.0, 0.0), (h, 0.0), (h, w), (0.0, w)],
+    }
+}
+
+/// Get transparency value for a block (1.0 = opaque, 0.0 = fully transparent)
+fn get_block_transparency(name: &str) -> f32 {
+    let name = name.strip_prefix("minecraft:").unwrap_or(name);
+    match name {
+        n if n.contains("leaves") => 0.9,
+        n if n.contains("glass") => 0.3,
+        n if n.contains("ice") && !n.contains("packed") && !n.contains("blue") => 0.7,
+        n if n == "water" => 0.4,
+        _ => 1.0,
+    }
 }
 
 /// Generate OBJ file from schematic (simple per-block cubes)
@@ -303,7 +330,8 @@ fn export_obj_internal<P: AsRef<Path>>(
     let total_positions = schematic.width as u64 * schematic.height as u64 * schematic.length as u64;
     let pb = create_progress_bar(total_positions, "Collecting materials");
 
-    let mut materials: HashMap<String, (f32, f32, f32, Option<String>)> = HashMap::new();
+    // Materials: (r, g, b, opacity, texture_file)
+    let mut materials: HashMap<String, (f32, f32, f32, f32, Option<String>)> = HashMap::new();
     let mut processed = 0u64;
 
     for y in 0..schematic.height {
@@ -318,6 +346,7 @@ fn export_obj_internal<P: AsRef<Path>>(
                     let mat_name = block.display_name().replace([':', '[', ']', '=', ','], "_");
                     if !materials.contains_key(&mat_name) {
                         let color = get_block_color(&block.name);
+                        let opacity = get_block_transparency(&block.name);
                         let texture_file = if let (Some(tex_mgr), Some(tex_out_dir)) = (textures, &tex_dir) {
                             if let Some(tex_path) = tex_mgr.get_texture(&block.name) {
                                 let tex_name = format!("{}.png", mat_name);
@@ -327,7 +356,7 @@ fn export_obj_internal<P: AsRef<Path>>(
                                 } else { None }
                             } else { None }
                         } else { None };
-                        materials.insert(mat_name.clone(), (color.0, color.1, color.2, texture_file));
+                        materials.insert(mat_name.clone(), (color.0, color.1, color.2, opacity, texture_file));
                     }
                 }
             }
@@ -336,7 +365,7 @@ fn export_obj_internal<P: AsRef<Path>>(
     pb.finish_with_message(format!("Found {} unique materials", materials.len()));
 
     // Write materials
-    for (name, (r, g, b, tex_file)) in &materials {
+    for (name, (r, g, b, opacity, tex_file)) in &materials {
         writeln!(mtl_file, "newmtl {}", name)?;
         writeln!(mtl_file, "Kd {} {} {}", r, g, b)?;
         writeln!(mtl_file, "Ka 0.2 0.2 0.2")?;
@@ -347,7 +376,7 @@ fn export_obj_internal<P: AsRef<Path>>(
             writeln!(mtl_file, "Ks 0.0 0.0 0.0")?;
             writeln!(mtl_file, "Ns 10.0")?;
         }
-        writeln!(mtl_file, "d 1.0")?;
+        writeln!(mtl_file, "d {}", opacity)?;
         writeln!(mtl_file, "illum 2")?;
         if let Some(tex) = tex_file {
             writeln!(mtl_file, "map_Kd {}", tex)?;
@@ -464,12 +493,10 @@ fn generate_greedy_geometry<W: Write>(
 
         // Write face with UV coordinates
         if use_textures {
-            // Write UV coordinates for this quad - tile texture based on quad size
-            let (w, h) = (quad.size.0 as f32, quad.size.1 as f32);
-            writeln!(obj_file, "vt 0 0")?;
-            writeln!(obj_file, "vt {} 0", w)?;
-            writeln!(obj_file, "vt {} {}", w, h)?;
-            writeln!(obj_file, "vt 0 {}", h)?;
+            // Write UV coordinates for this quad (computed per-direction for correct tiling)
+            for uv in &quad.uv_coords {
+                writeln!(obj_file, "vt {} {}", uv.0, uv.1)?;
+            }
 
             writeln!(obj_file, "f {}/{} {}/{} {}/{} {}/{}",
                 vertex_index, vt_index,
@@ -618,7 +645,10 @@ fn greedy_mesh_2d(
                 slice_idx, d1, d2, width, height, dir, w, h, l
             );
 
-            quads.push(GreedyQuad { material, vertices, size: (width, height) });
+            // Compute UV coordinates based on face direction
+            let uv_coords = get_uv_coords(dir, width, height);
+
+            quads.push(GreedyQuad { material, vertices, uv_coords });
         }
     }
 
