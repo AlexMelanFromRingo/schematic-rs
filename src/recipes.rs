@@ -80,6 +80,131 @@ pub fn get_recipes() -> HashMap<&'static str, Recipe> {
             ingredients: &[("minecraft:any_planks", 2)],
         },
 
+        // === Wood stairs (all types) ===
+        Recipe { output: "minecraft:oak_stairs", output_count: 4, ingredients: &[("minecraft:oak_planks", 6)] },
+        Recipe { output: "minecraft:spruce_stairs", output_count: 4, ingredients: &[("minecraft:spruce_planks", 6)] },
+        Recipe { output: "minecraft:birch_stairs", output_count: 4, ingredients: &[("minecraft:birch_planks", 6)] },
+        Recipe { output: "minecraft:jungle_stairs", output_count: 4, ingredients: &[("minecraft:jungle_planks", 6)] },
+        Recipe { output: "minecraft:acacia_stairs", output_count: 4, ingredients: &[("minecraft:acacia_planks", 6)] },
+        Recipe { output: "minecraft:dark_oak_stairs", output_count: 4, ingredients: &[("minecraft:dark_oak_planks", 6)] },
+        Recipe { output: "minecraft:mangrove_stairs", output_count: 4, ingredients: &[("minecraft:mangrove_planks", 6)] },
+        Recipe { output: "minecraft:cherry_stairs", output_count: 4, ingredients: &[("minecraft:cherry_planks", 6)] },
+        Recipe { output: "minecraft:bamboo_stairs", output_count: 4, ingredients: &[("minecraft:bamboo_planks", 6)] },
+        Recipe { output: "minecraft:crimson_stairs", output_count: 4, ingredients: &[("minecraft:crimson_planks", 6)] },
+        Recipe { output: "minecraft:warped_stairs", output_count: 4, ingredients: &[("minecraft:warped_planks", 6)] },
+
+        // === Wood slabs ===
+        Recipe { output: "minecraft:oak_slab", output_count: 6, ingredients: &[("minecraft:oak_planks", 3)] },
+        Recipe { output: "minecraft:spruce_slab", output_count: 6, ingredients: &[("minecraft:spruce_planks", 3)] },
+        Recipe { output: "minecraft:birch_slab", output_count: 6, ingredients: &[("minecraft:birch_planks", 3)] },
+        Recipe { output: "minecraft:jungle_slab", output_count: 6, ingredients: &[("minecraft:jungle_planks", 3)] },
+        Recipe { output: "minecraft:acacia_slab", output_count: 6, ingredients: &[("minecraft:acacia_planks", 3)] },
+        Recipe { output: "minecraft:dark_oak_slab", output_count: 6, ingredients: &[("minecraft:dark_oak_planks", 3)] },
+        Recipe { output: "minecraft:mangrove_slab", output_count: 6, ingredients: &[("minecraft:mangrove_planks", 3)] },
+        Recipe { output: "minecraft:cherry_slab", output_count: 6, ingredients: &[("minecraft:cherry_planks", 3)] },
+        Recipe { output: "minecraft:bamboo_slab", output_count: 6, ingredients: &[("minecraft:bamboo_planks", 3)] },
+        Recipe { output: "minecraft:crimson_slab", output_count: 6, ingredients: &[("minecraft:crimson_planks", 3)] },
+        Recipe { output: "minecraft:warped_slab", output_count: 6, ingredients: &[("minecraft:warped_planks", 3)] },
+
+        // === Wood fences ===
+        Recipe { output: "minecraft:oak_fence", output_count: 3, ingredients: &[("minecraft:oak_planks", 4), ("minecraft:stick", 2)] },
+        Recipe { output: "minecraft:spruce_fence", output_count: 3, ingredients: &[("minecraft:spruce_planks", 4), ("minecraft:stick", 2)] },
+        Recipe { output: "minecraft:birch_fence", output_count: 3, ingredients: &[("minecraft:birch_planks", 4), ("minecraft:stick", 2)] },
+        Recipe { output: "minecraft:jungle_fence", output_count: 3, ingredients: &[("minecraft:jungle_planks", 4), ("minecraft:stick", 2)] },
+        Recipe { output: "minecraft:acacia_fence", output_count: 3, ingredients: &[("minecraft:acacia_planks", 4), ("minecraft:stick", 2)] },
+        Recipe { output: "minecraft:dark_oak_fence", output_count: 3, ingredients: &[("minecraft:dark_oak_planks", 4), ("minecraft:stick", 2)] },
+        Recipe { output: "minecraft:mangrove_fence", output_count: 3, ingredients: &[("minecraft:mangrove_planks", 4), ("minecraft:stick", 2)] },
+        Recipe { output: "minecraft:cherry_fence", output_count: 3, ingredients: &[("minecraft:cherry_planks", 4), ("minecraft:stick", 2)] },
+        Recipe { output: "minecraft:bamboo_fence", output_count: 3, ingredients: &[("minecraft:bamboo_planks", 4), ("minecraft:stick", 2)] },
+        Recipe { output: "minecraft:crimson_fence", output_count: 3, ingredients: &[("minecraft:crimson_planks", 4), ("minecraft:stick", 2)] },
+        Recipe { output: "minecraft:warped_fence", output_count: 3, ingredients: &[("minecraft:warped_planks", 4), ("minecraft:stick", 2)] },
+
+        // === Fence gates ===
+        Recipe { output: "minecraft:oak_fence_gate", output_count: 1, ingredients: &[("minecraft:oak_planks", 2), ("minecraft:stick", 4)] },
+        Recipe { output: "minecraft:spruce_fence_gate", output_count: 1, ingredients: &[("minecraft:spruce_planks", 2), ("minecraft:stick", 4)] },
+        Recipe { output: "minecraft:birch_fence_gate", output_count: 1, ingredients: &[("minecraft:birch_planks", 2), ("minecraft:stick", 4)] },
+        Recipe { output: "minecraft:jungle_fence_gate", output_count: 1, ingredients: &[("minecraft:jungle_planks", 2), ("minecraft:stick", 4)] },
+        Recipe { output: "minecraft:acacia_fence_gate", output_count: 1, ingredients: &[("minecraft:acacia_planks", 2), ("minecraft:stick", 4)] },
+        Recipe { output: "minecraft:dark_oak_fence_gate", output_count: 1, ingredients: &[("minecraft:dark_oak_planks", 2), ("minecraft:stick", 4)] },
+        Recipe { output: "minecraft:mangrove_fence_gate", output_count: 1, ingredients: &[("minecraft:mangrove_planks", 2), ("minecraft:stick", 4)] },
+        Recipe { output: "minecraft:cherry_fence_gate", output_count: 1, ingredients: &[("minecraft:cherry_planks", 2), ("minecraft:stick", 4)] },
+        Recipe { output: "minecraft:bamboo_fence_gate", output_count: 1, ingredients: &[("minecraft:bamboo_planks", 2), ("minecraft:stick", 4)] },
+        Recipe { output: "minecraft:crimson_fence_gate", output_count: 1, ingredients: &[("minecraft:crimson_planks", 2), ("minecraft:stick", 4)] },
+        Recipe { output: "minecraft:warped_fence_gate", output_count: 1, ingredients: &[("minecraft:warped_planks", 2), ("minecraft:stick", 4)] },
+
+        // === Doors ===
+        Recipe { output: "minecraft:oak_door", output_count: 3, ingredients: &[("minecraft:oak_planks", 6)] },
+        Recipe { output: "minecraft:spruce_door", output_count: 3, ingredients: &[("minecraft:spruce_planks", 6)] },
+        Recipe { output: "minecraft:birch_door", output_count: 3, ingredients: &[("minecraft:birch_planks", 6)] },
+        Recipe { output: "minecraft:jungle_door", output_count: 3, ingredients: &[("minecraft:jungle_planks", 6)] },
+        Recipe { output: "minecraft:acacia_door", output_count: 3, ingredients: &[("minecraft:acacia_planks", 6)] },
+        Recipe { output: "minecraft:dark_oak_door", output_count: 3, ingredients: &[("minecraft:dark_oak_planks", 6)] },
+        Recipe { output: "minecraft:mangrove_door", output_count: 3, ingredients: &[("minecraft:mangrove_planks", 6)] },
+        Recipe { output: "minecraft:cherry_door", output_count: 3, ingredients: &[("minecraft:cherry_planks", 6)] },
+        Recipe { output: "minecraft:bamboo_door", output_count: 3, ingredients: &[("minecraft:bamboo_planks", 6)] },
+        Recipe { output: "minecraft:crimson_door", output_count: 3, ingredients: &[("minecraft:crimson_planks", 6)] },
+        Recipe { output: "minecraft:warped_door", output_count: 3, ingredients: &[("minecraft:warped_planks", 6)] },
+        Recipe { output: "minecraft:iron_door", output_count: 3, ingredients: &[("minecraft:iron_ingot", 6)] },
+
+        // === Trapdoors ===
+        Recipe { output: "minecraft:oak_trapdoor", output_count: 2, ingredients: &[("minecraft:oak_planks", 6)] },
+        Recipe { output: "minecraft:spruce_trapdoor", output_count: 2, ingredients: &[("minecraft:spruce_planks", 6)] },
+        Recipe { output: "minecraft:birch_trapdoor", output_count: 2, ingredients: &[("minecraft:birch_planks", 6)] },
+        Recipe { output: "minecraft:jungle_trapdoor", output_count: 2, ingredients: &[("minecraft:jungle_planks", 6)] },
+        Recipe { output: "minecraft:acacia_trapdoor", output_count: 2, ingredients: &[("minecraft:acacia_planks", 6)] },
+        Recipe { output: "minecraft:dark_oak_trapdoor", output_count: 2, ingredients: &[("minecraft:dark_oak_planks", 6)] },
+        Recipe { output: "minecraft:mangrove_trapdoor", output_count: 2, ingredients: &[("minecraft:mangrove_planks", 6)] },
+        Recipe { output: "minecraft:cherry_trapdoor", output_count: 2, ingredients: &[("minecraft:cherry_planks", 6)] },
+        Recipe { output: "minecraft:bamboo_trapdoor", output_count: 2, ingredients: &[("minecraft:bamboo_planks", 6)] },
+        Recipe { output: "minecraft:crimson_trapdoor", output_count: 2, ingredients: &[("minecraft:crimson_planks", 6)] },
+        Recipe { output: "minecraft:warped_trapdoor", output_count: 2, ingredients: &[("minecraft:warped_planks", 6)] },
+        Recipe { output: "minecraft:iron_trapdoor", output_count: 1, ingredients: &[("minecraft:iron_ingot", 4)] },
+
+        // === Pressure plates ===
+        Recipe { output: "minecraft:oak_pressure_plate", output_count: 1, ingredients: &[("minecraft:oak_planks", 2)] },
+        Recipe { output: "minecraft:spruce_pressure_plate", output_count: 1, ingredients: &[("minecraft:spruce_planks", 2)] },
+        Recipe { output: "minecraft:birch_pressure_plate", output_count: 1, ingredients: &[("minecraft:birch_planks", 2)] },
+        Recipe { output: "minecraft:jungle_pressure_plate", output_count: 1, ingredients: &[("minecraft:jungle_planks", 2)] },
+        Recipe { output: "minecraft:acacia_pressure_plate", output_count: 1, ingredients: &[("minecraft:acacia_planks", 2)] },
+        Recipe { output: "minecraft:dark_oak_pressure_plate", output_count: 1, ingredients: &[("minecraft:dark_oak_planks", 2)] },
+        Recipe { output: "minecraft:mangrove_pressure_plate", output_count: 1, ingredients: &[("minecraft:mangrove_planks", 2)] },
+        Recipe { output: "minecraft:cherry_pressure_plate", output_count: 1, ingredients: &[("minecraft:cherry_planks", 2)] },
+        Recipe { output: "minecraft:bamboo_pressure_plate", output_count: 1, ingredients: &[("minecraft:bamboo_planks", 2)] },
+        Recipe { output: "minecraft:crimson_pressure_plate", output_count: 1, ingredients: &[("minecraft:crimson_planks", 2)] },
+        Recipe { output: "minecraft:warped_pressure_plate", output_count: 1, ingredients: &[("minecraft:warped_planks", 2)] },
+        Recipe { output: "minecraft:stone_pressure_plate", output_count: 1, ingredients: &[("minecraft:stone", 2)] },
+        Recipe { output: "minecraft:polished_blackstone_pressure_plate", output_count: 1, ingredients: &[("minecraft:polished_blackstone", 2)] },
+        Recipe { output: "minecraft:heavy_weighted_pressure_plate", output_count: 1, ingredients: &[("minecraft:iron_ingot", 2)] },
+        Recipe { output: "minecraft:light_weighted_pressure_plate", output_count: 1, ingredients: &[("minecraft:gold_ingot", 2)] },
+
+        // === Buttons ===
+        Recipe { output: "minecraft:oak_button", output_count: 1, ingredients: &[("minecraft:oak_planks", 1)] },
+        Recipe { output: "minecraft:spruce_button", output_count: 1, ingredients: &[("minecraft:spruce_planks", 1)] },
+        Recipe { output: "minecraft:birch_button", output_count: 1, ingredients: &[("minecraft:birch_planks", 1)] },
+        Recipe { output: "minecraft:jungle_button", output_count: 1, ingredients: &[("minecraft:jungle_planks", 1)] },
+        Recipe { output: "minecraft:acacia_button", output_count: 1, ingredients: &[("minecraft:acacia_planks", 1)] },
+        Recipe { output: "minecraft:dark_oak_button", output_count: 1, ingredients: &[("minecraft:dark_oak_planks", 1)] },
+        Recipe { output: "minecraft:mangrove_button", output_count: 1, ingredients: &[("minecraft:mangrove_planks", 1)] },
+        Recipe { output: "minecraft:cherry_button", output_count: 1, ingredients: &[("minecraft:cherry_planks", 1)] },
+        Recipe { output: "minecraft:bamboo_button", output_count: 1, ingredients: &[("minecraft:bamboo_planks", 1)] },
+        Recipe { output: "minecraft:crimson_button", output_count: 1, ingredients: &[("minecraft:crimson_planks", 1)] },
+        Recipe { output: "minecraft:warped_button", output_count: 1, ingredients: &[("minecraft:warped_planks", 1)] },
+        Recipe { output: "minecraft:stone_button", output_count: 1, ingredients: &[("minecraft:stone", 1)] },
+        Recipe { output: "minecraft:polished_blackstone_button", output_count: 1, ingredients: &[("minecraft:polished_blackstone", 1)] },
+
+        // === Signs ===
+        Recipe { output: "minecraft:oak_sign", output_count: 3, ingredients: &[("minecraft:oak_planks", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:spruce_sign", output_count: 3, ingredients: &[("minecraft:spruce_planks", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:birch_sign", output_count: 3, ingredients: &[("minecraft:birch_planks", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:jungle_sign", output_count: 3, ingredients: &[("minecraft:jungle_planks", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:acacia_sign", output_count: 3, ingredients: &[("minecraft:acacia_planks", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:dark_oak_sign", output_count: 3, ingredients: &[("minecraft:dark_oak_planks", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:mangrove_sign", output_count: 3, ingredients: &[("minecraft:mangrove_planks", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:cherry_sign", output_count: 3, ingredients: &[("minecraft:cherry_planks", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:bamboo_sign", output_count: 3, ingredients: &[("minecraft:bamboo_planks", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:crimson_sign", output_count: 3, ingredients: &[("minecraft:crimson_planks", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:warped_sign", output_count: 3, ingredients: &[("minecraft:warped_planks", 6), ("minecraft:stick", 1)] },
+
         // === Stone products ===
         Recipe {
             output: "minecraft:stone_bricks",
@@ -136,6 +261,42 @@ pub fn get_recipes() -> HashMap<&'static str, Recipe> {
             output_count: 1,
             ingredients: &[("minecraft:clay_ball", 1)], // smelting
         },
+        Recipe {
+            output: "minecraft:brick_stairs",
+            output_count: 4,
+            ingredients: &[("minecraft:bricks", 6)],
+        },
+        Recipe {
+            output: "minecraft:brick_slab",
+            output_count: 6,
+            ingredients: &[("minecraft:bricks", 3)],
+        },
+        Recipe {
+            output: "minecraft:brick_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:bricks", 6)],
+        },
+        // Cracked stone bricks (smelting)
+        Recipe {
+            output: "minecraft:cracked_stone_bricks",
+            output_count: 1,
+            ingredients: &[("minecraft:stone_bricks", 1)],
+        },
+        Recipe {
+            output: "minecraft:mossy_stone_bricks",
+            output_count: 1,
+            ingredients: &[("minecraft:stone_bricks", 1), ("minecraft:vine", 1)],
+        },
+        Recipe {
+            output: "minecraft:mossy_cobblestone",
+            output_count: 1,
+            ingredients: &[("minecraft:cobblestone", 1), ("minecraft:vine", 1)],
+        },
+        Recipe {
+            output: "minecraft:stone_brick_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:stone_bricks", 6)],
+        },
 
         // === Deepslate ===
         Recipe {
@@ -158,6 +319,78 @@ pub fn get_recipes() -> HashMap<&'static str, Recipe> {
             output_count: 1,
             ingredients: &[("minecraft:cobbled_deepslate", 2)], // via slabs
         },
+        // Cracked variants (smelting)
+        Recipe {
+            output: "minecraft:cracked_deepslate_bricks",
+            output_count: 1,
+            ingredients: &[("minecraft:deepslate_bricks", 1)],
+        },
+        Recipe {
+            output: "minecraft:cracked_deepslate_tiles",
+            output_count: 1,
+            ingredients: &[("minecraft:deepslate_tiles", 1)],
+        },
+        // Deepslate stairs and slabs
+        Recipe {
+            output: "minecraft:cobbled_deepslate_stairs",
+            output_count: 4,
+            ingredients: &[("minecraft:cobbled_deepslate", 6)],
+        },
+        Recipe {
+            output: "minecraft:cobbled_deepslate_slab",
+            output_count: 6,
+            ingredients: &[("minecraft:cobbled_deepslate", 3)],
+        },
+        Recipe {
+            output: "minecraft:cobbled_deepslate_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:cobbled_deepslate", 6)],
+        },
+        Recipe {
+            output: "minecraft:polished_deepslate_stairs",
+            output_count: 4,
+            ingredients: &[("minecraft:polished_deepslate", 6)],
+        },
+        Recipe {
+            output: "minecraft:polished_deepslate_slab",
+            output_count: 6,
+            ingredients: &[("minecraft:polished_deepslate", 3)],
+        },
+        Recipe {
+            output: "minecraft:polished_deepslate_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:polished_deepslate", 6)],
+        },
+        Recipe {
+            output: "minecraft:deepslate_brick_stairs",
+            output_count: 4,
+            ingredients: &[("minecraft:deepslate_bricks", 6)],
+        },
+        Recipe {
+            output: "minecraft:deepslate_brick_slab",
+            output_count: 6,
+            ingredients: &[("minecraft:deepslate_bricks", 3)],
+        },
+        Recipe {
+            output: "minecraft:deepslate_brick_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:deepslate_bricks", 6)],
+        },
+        Recipe {
+            output: "minecraft:deepslate_tile_stairs",
+            output_count: 4,
+            ingredients: &[("minecraft:deepslate_tiles", 6)],
+        },
+        Recipe {
+            output: "minecraft:deepslate_tile_slab",
+            output_count: 6,
+            ingredients: &[("minecraft:deepslate_tiles", 3)],
+        },
+        Recipe {
+            output: "minecraft:deepslate_tile_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:deepslate_tiles", 6)],
+        },
 
         // === Blackstone ===
         Recipe {
@@ -175,6 +408,58 @@ pub fn get_recipes() -> HashMap<&'static str, Recipe> {
             output_count: 1,
             ingredients: &[("minecraft:blackstone", 2)], // via slabs
         },
+        // Cracked blackstone (smelting)
+        Recipe {
+            output: "minecraft:cracked_polished_blackstone_bricks",
+            output_count: 1,
+            ingredients: &[("minecraft:polished_blackstone_bricks", 1)],
+        },
+        // Blackstone stairs and slabs
+        Recipe {
+            output: "minecraft:blackstone_stairs",
+            output_count: 4,
+            ingredients: &[("minecraft:blackstone", 6)],
+        },
+        Recipe {
+            output: "minecraft:blackstone_slab",
+            output_count: 6,
+            ingredients: &[("minecraft:blackstone", 3)],
+        },
+        Recipe {
+            output: "minecraft:blackstone_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:blackstone", 6)],
+        },
+        Recipe {
+            output: "minecraft:polished_blackstone_stairs",
+            output_count: 4,
+            ingredients: &[("minecraft:polished_blackstone", 6)],
+        },
+        Recipe {
+            output: "minecraft:polished_blackstone_slab",
+            output_count: 6,
+            ingredients: &[("minecraft:polished_blackstone", 3)],
+        },
+        Recipe {
+            output: "minecraft:polished_blackstone_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:polished_blackstone", 6)],
+        },
+        Recipe {
+            output: "minecraft:polished_blackstone_brick_stairs",
+            output_count: 4,
+            ingredients: &[("minecraft:polished_blackstone_bricks", 6)],
+        },
+        Recipe {
+            output: "minecraft:polished_blackstone_brick_slab",
+            output_count: 6,
+            ingredients: &[("minecraft:polished_blackstone_bricks", 3)],
+        },
+        Recipe {
+            output: "minecraft:polished_blackstone_brick_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:polished_blackstone_bricks", 6)],
+        },
 
         // === Nether ===
         Recipe {
@@ -191,6 +476,51 @@ pub fn get_recipes() -> HashMap<&'static str, Recipe> {
             output: "minecraft:red_nether_bricks",
             output_count: 1,
             ingredients: &[("minecraft:nether_brick", 2), ("minecraft:nether_wart", 2)],
+        },
+        Recipe {
+            output: "minecraft:cracked_nether_bricks",
+            output_count: 1,
+            ingredients: &[("minecraft:nether_bricks", 1)], // smelting
+        },
+        Recipe {
+            output: "minecraft:chiseled_nether_bricks",
+            output_count: 1,
+            ingredients: &[("minecraft:nether_bricks", 2)], // via slabs
+        },
+        Recipe {
+            output: "minecraft:nether_brick_stairs",
+            output_count: 4,
+            ingredients: &[("minecraft:nether_bricks", 6)],
+        },
+        Recipe {
+            output: "minecraft:nether_brick_slab",
+            output_count: 6,
+            ingredients: &[("minecraft:nether_bricks", 3)],
+        },
+        Recipe {
+            output: "minecraft:nether_brick_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:nether_bricks", 6)],
+        },
+        Recipe {
+            output: "minecraft:nether_brick_fence",
+            output_count: 6,
+            ingredients: &[("minecraft:nether_bricks", 4), ("minecraft:nether_brick", 2)],
+        },
+        Recipe {
+            output: "minecraft:red_nether_brick_stairs",
+            output_count: 4,
+            ingredients: &[("minecraft:red_nether_bricks", 6)],
+        },
+        Recipe {
+            output: "minecraft:red_nether_brick_slab",
+            output_count: 6,
+            ingredients: &[("minecraft:red_nether_bricks", 3)],
+        },
+        Recipe {
+            output: "minecraft:red_nether_brick_wall",
+            output_count: 6,
+            ingredients: &[("minecraft:red_nether_bricks", 6)],
         },
         Recipe {
             output: "minecraft:quartz_block",
