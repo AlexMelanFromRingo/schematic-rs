@@ -3,6 +3,7 @@ pub mod schem;
 pub mod litematica;
 pub mod block;
 pub mod block_geometry;
+pub mod mc_models;
 pub mod error;
 pub mod recipes;
 pub mod export3d;

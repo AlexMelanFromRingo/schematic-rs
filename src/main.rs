@@ -184,6 +184,10 @@ enum Commands {
         #[arg(short, long)]
         greedy: bool,
 
+        /// Use Minecraft JSON models for accurate block geometry
+        #[arg(long)]
+        models: bool,
+
         /// Extract and apply textures from Minecraft installation
         #[arg(short, long)]
         textures: bool,
@@ -250,7 +254,7 @@ fn main() -> Result<()> {
         Commands::Export { file, output } => cmd_export(&file, &output)?,
         Commands::Materials { file, sort, verbose, limit } => cmd_materials(&file, sort, verbose, limit)?,
         Commands::Layer { file, y, ascii } => cmd_layer(&file, y, ascii)?,
-        Commands::RenderObj { file, output, hollow, greedy, textures, minecraft } => cmd_render_obj(&file, &output, hollow, greedy, textures, minecraft.as_deref())?,
+        Commands::RenderObj { file, output, hollow, greedy, models, textures, minecraft } => cmd_render_obj(&file, &output, hollow, greedy, models, textures, minecraft.as_deref())?,
         Commands::RenderHtml { file, output, max_blocks } => cmd_render_html(&file, &output, max_blocks)?,
         Commands::Debug { file } => cmd_debug(&file)?,
     }
@@ -788,7 +792,7 @@ fn cmd_layer(file: &PathBuf, y: u16, ascii: bool) -> Result<()> {
     Ok(())
 }
 
-fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, greedy: bool, use_textures: bool, minecraft_path: Option<&std::path::Path>) -> Result<()> {
+fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, greedy: bool, use_models: bool, use_textures: bool, minecraft_path: Option<&std::path::Path>) -> Result<()> {
     let schem = UnifiedSchematic::load(file)?;
 
     println!("{}", "=== Exporting to OBJ ===".bold().cyan());
@@ -796,7 +800,9 @@ fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, greedy: bool, 
     println!("  Schematic: {}x{}x{}", schem.width, schem.height, schem.length);
     println!("  Solid blocks: {}", schem.solid_blocks());
 
-    if greedy {
+    if use_models {
+        println!("  Mode: {} (accurate Minecraft geometry)", "JSON models".green());
+    } else if greedy {
         println!("  Mode: {} (optimized polygon count)", "greedy meshing".green());
     } else {
         println!("  Hollow mode: {}", if hollow { "yes (only visible faces)" } else { "no (all blocks)" });
@@ -825,7 +831,24 @@ fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, greedy: bool, 
     };
     println!();
 
-    if greedy {
+    if use_models {
+        // Find Minecraft jar for models
+        let jar_path = if let Some(mc_path) = minecraft_path {
+            if mc_path.extension().map(|e| e == "jar").unwrap_or(false) {
+                mc_path.to_path_buf()
+            } else {
+                schem_tool::textures::find_client_jar(mc_path)
+                    .ok_or_else(|| anyhow::anyhow!("Could not find Minecraft client.jar in {}", mc_path.display()))?
+            }
+        } else {
+            let mc_dir = schem_tool::textures::get_minecraft_dir()
+                .ok_or_else(|| anyhow::anyhow!("Could not find Minecraft directory"))?;
+            schem_tool::textures::find_client_jar(&mc_dir)
+                .ok_or_else(|| anyhow::anyhow!("Could not find Minecraft client.jar"))?
+        };
+        println!("  Using models from: {}", jar_path.display());
+        schem_tool::export3d::export_obj_with_models(&schem, output, &jar_path, textures.as_ref())?;
+    } else if greedy {
         schem_tool::export3d::export_obj_greedy(&schem, output, textures.as_ref())?;
     } else {
         schem_tool::export3d::export_obj_with_textures(&schem, output, hollow, true, textures.as_ref())?;
