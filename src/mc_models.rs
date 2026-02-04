@@ -203,10 +203,14 @@ pub struct ResolvedModel {
 
 /// Minecraft model manager - loads and caches models from client.jar
 pub struct ModelManager {
-    /// Cached blockstates
+    /// Cached blockstates (vanilla)
     blockstates: HashMap<String, Blockstate>,
-    /// Cached models
+    /// Cached models (vanilla)
     models: HashMap<String, BlockModel>,
+    /// Resource pack blockstates (override vanilla)
+    resource_pack_blockstates: HashMap<String, Blockstate>,
+    /// Resource pack models (override vanilla)
+    resource_pack_models: HashMap<String, BlockModel>,
     /// Resolved models cache
     resolved_cache: HashMap<String, ResolvedModel>,
 }
@@ -214,6 +218,14 @@ pub struct ModelManager {
 impl ModelManager {
     /// Create a new model manager from a Minecraft client.jar
     pub fn from_jar<P: AsRef<Path>>(jar_path: P) -> std::io::Result<Self> {
+        Self::from_jar_with_resource_pack(jar_path, None::<&std::path::Path>)
+    }
+
+    /// Create a new model manager from a Minecraft client.jar with optional resource pack
+    pub fn from_jar_with_resource_pack<P: AsRef<Path>, R: AsRef<Path>>(
+        jar_path: P,
+        resource_pack: Option<R>,
+    ) -> std::io::Result<Self> {
         let jar_path = jar_path.as_ref();
         let file = std::fs::File::open(jar_path)?;
         let mut archive = ZipArchive::new(file)
@@ -282,18 +294,117 @@ impl ModelManager {
 
         eprintln!("Loaded {} blockstates and {} models", blockstates.len(), models.len());
 
-        Ok(Self {
+        let mut manager = Self {
             blockstates,
             models,
+            resource_pack_blockstates: HashMap::new(),
+            resource_pack_models: HashMap::new(),
             resolved_cache: HashMap::new(),
-        })
+        };
+
+        // Load resource pack if provided
+        if let Some(pack_path) = resource_pack {
+            match manager.load_resource_pack(pack_path.as_ref()) {
+                Ok((bs_count, model_count)) => {
+                    if bs_count > 0 || model_count > 0 {
+                        eprintln!("Loaded {} blockstates and {} models from resource pack", bs_count, model_count);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to load resource pack: {}", e);
+                }
+            }
+        }
+
+        Ok(manager)
+    }
+
+    /// Load blockstates and models from a resource pack (ZIP file)
+    pub fn load_resource_pack(&mut self, pack_path: &Path) -> std::io::Result<(usize, usize)> {
+        let file = std::fs::File::open(pack_path)?;
+        let mut archive = ZipArchive::new(file)
+            .map_err(|e| std::io::Error::other(format!("Failed to open resource pack: {}", e)))?;
+
+        let mut bs_count = 0;
+        let mut model_count = 0;
+
+        // Load blockstates
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            let name = file.name().to_string();
+
+            if name.starts_with("assets/minecraft/blockstates/") && name.ends_with(".json") {
+                let block_name = name
+                    .strip_prefix("assets/minecraft/blockstates/")
+                    .unwrap()
+                    .strip_suffix(".json")
+                    .unwrap();
+
+                let mut content = String::new();
+                file.read_to_string(&mut content)?;
+
+                match serde_json::from_str::<Blockstate>(&content) {
+                    Ok(bs) => {
+                        self.resource_pack_blockstates.insert(block_name.to_string(), bs);
+                        bs_count += 1;
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Failed to parse resource pack blockstate {}: {}", block_name, e);
+                    }
+                }
+            }
+        }
+
+        // Reload archive for models
+        let file = std::fs::File::open(pack_path)?;
+        let mut archive = ZipArchive::new(file)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        // Load models
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            let name = file.name().to_string();
+
+            if name.starts_with("assets/minecraft/models/block/") && name.ends_with(".json") {
+                let model_name = name
+                    .strip_prefix("assets/minecraft/models/")
+                    .unwrap()
+                    .strip_suffix(".json")
+                    .unwrap();
+
+                let mut content = String::new();
+                file.read_to_string(&mut content)?;
+
+                match serde_json::from_str::<BlockModel>(&content) {
+                    Ok(model) => {
+                        self.resource_pack_models.insert(model_name.to_string(), model);
+                        model_count += 1;
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Failed to parse resource pack model {}: {}", model_name, e);
+                    }
+                }
+            }
+        }
+
+        // Clear resolved cache since models may have changed
+        self.resolved_cache.clear();
+
+        Ok((bs_count, model_count))
     }
 
     /// Get model references for a block with given properties
+    /// Checks resource pack first, then falls back to vanilla
     pub fn get_models_for_block(&self, block_name: &str, properties: &HashMap<String, String>) -> Vec<(ModelRef, String)> {
         let name = block_name.strip_prefix("minecraft:").unwrap_or(block_name);
 
-        let Some(blockstate) = self.blockstates.get(name) else {
+        // Check resource pack first, then vanilla
+        let blockstate = self.resource_pack_blockstates.get(name)
+            .or_else(|| self.blockstates.get(name));
+
+        let Some(blockstate) = blockstate else {
             return Vec::new();
         };
 
@@ -418,6 +529,7 @@ impl ModelManager {
     }
 
     /// Resolve a model by name, following parent chain
+    /// Checks resource pack first, then falls back to vanilla
     pub fn resolve_model(&mut self, model_path: &str) -> Option<ResolvedModel> {
         // Check cache first
         if let Some(cached) = self.resolved_cache.get(model_path) {
@@ -429,7 +541,10 @@ impl ModelManager {
             .strip_prefix("minecraft:")
             .unwrap_or(model_path);
 
-        let model = self.models.get(normalized)?.clone();
+        // Check resource pack first, then vanilla
+        let model = self.resource_pack_models.get(normalized)
+            .or_else(|| self.models.get(normalized))?
+            .clone();
 
         // Resolve parent chain
         let mut resolved = ResolvedModel::default();

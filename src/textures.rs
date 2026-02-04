@@ -112,6 +112,8 @@ pub fn textures_cached(cache_dir: &Path) -> bool {
 pub struct TextureManager {
     texture_dir: PathBuf,
     texture_map: HashMap<String, PathBuf>,
+    /// Resource pack texture overrides (texture name -> path)
+    resource_pack_textures: HashMap<String, PathBuf>,
 }
 
 impl TextureManager {
@@ -120,6 +122,7 @@ impl TextureManager {
         let mut manager = Self {
             texture_dir,
             texture_map: HashMap::new(),
+            resource_pack_textures: HashMap::new(),
         };
         manager.scan_textures();
         manager
@@ -127,11 +130,11 @@ impl TextureManager {
 
     /// Try to initialize from cache or extract from Minecraft
     pub fn from_minecraft() -> Option<Self> {
-        Self::from_minecraft_with_path(None)
+        Self::from_minecraft_with_path(None, None)
     }
 
     /// Try to initialize with optional custom Minecraft path or jar path
-    pub fn from_minecraft_with_path(custom_path: Option<&Path>) -> Option<Self> {
+    pub fn from_minecraft_with_path(custom_path: Option<&Path>, resource_pack: Option<&Path>) -> Option<Self> {
         let cache_dir = get_cache_dir()?;
 
         // Determine jar path
@@ -177,7 +180,66 @@ impl TextureManager {
             }
         }
 
-        Some(Self::new(cache_dir))
+        let mut manager = Self::new(cache_dir);
+
+        // Load resource pack textures if provided
+        if let Some(pack_path) = resource_pack {
+            match manager.load_resource_pack_textures(pack_path) {
+                Ok(count) => {
+                    if count > 0 {
+                        eprintln!("Loaded {} textures from resource pack", count);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to load resource pack textures: {}", e);
+                }
+            }
+        }
+
+        Some(manager)
+    }
+
+    /// Load textures from a resource pack (ZIP file)
+    pub fn load_resource_pack_textures(&mut self, pack_path: &Path) -> std::io::Result<usize> {
+        let file = File::open(pack_path)?;
+        let mut archive = ZipArchive::new(file)
+            .map_err(|e| std::io::Error::other(format!("Failed to open resource pack: {}", e)))?;
+
+        // Create cache directory for resource pack textures
+        let pack_cache = get_cache_dir()
+            .ok_or_else(|| std::io::Error::other("Could not get cache directory"))?
+            .join("resource_pack");
+        fs::create_dir_all(&pack_cache)?;
+
+        let prefix = "assets/minecraft/textures/block/";
+        let mut count = 0;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            let name = file.name().to_string();
+
+            if name.starts_with(prefix) && name.ends_with(".png") {
+                let texture_name = name[prefix.len()..].strip_suffix(".png").unwrap();
+                let dest_path = pack_cache.join(format!("{}.png", texture_name));
+
+                // Create parent dirs if needed
+                if let Some(parent) = dest_path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+
+                let mut contents = Vec::new();
+                file.read_to_end(&mut contents)?;
+
+                let mut dest_file = File::create(&dest_path)?;
+                dest_file.write_all(&contents)?;
+
+                self.resource_pack_textures.insert(texture_name.to_string(), dest_path);
+                count += 1;
+            }
+        }
+
+        Ok(count)
     }
 
     /// Scan the texture directory for available textures
@@ -195,26 +257,47 @@ impl TextureManager {
         }
     }
 
-    /// Get texture path for a block name
+    /// Get texture path for a block name (checks resource pack first, then vanilla)
     pub fn get_texture(&self, block_name: &str) -> Option<&PathBuf> {
         let name = block_name
             .strip_prefix("minecraft:")
             .unwrap_or(block_name);
 
-        // Direct match
+        // Check resource pack first (direct match)
+        if let Some(path) = self.resource_pack_textures.get(name) {
+            return Some(path);
+        }
+
+        // Direct match in vanilla
         if let Some(path) = self.texture_map.get(name) {
             return Some(path);
         }
 
         // Try common variations
         let variations = get_texture_variations(name);
-        for var in variations {
-            if let Some(path) = self.texture_map.get(&var) {
+        for var in &variations {
+            // Check resource pack first
+            if let Some(path) = self.resource_pack_textures.get(var) {
+                return Some(path);
+            }
+            // Then vanilla
+            if let Some(path) = self.texture_map.get(var) {
                 return Some(path);
             }
         }
 
         None
+    }
+
+    /// Check if texture exists in resource pack
+    pub fn has_resource_pack_texture(&self, name: &str) -> bool {
+        let name = name.strip_prefix("minecraft:").unwrap_or(name);
+        self.resource_pack_textures.contains_key(name)
+    }
+
+    /// Get count of resource pack textures
+    pub fn resource_pack_texture_count(&self) -> usize {
+        self.resource_pack_textures.len()
     }
 
     /// Get the texture directory path

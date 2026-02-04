@@ -195,6 +195,10 @@ enum Commands {
         /// Path to Minecraft directory or client.jar (e.g., ~/.minecraft or client.jar)
         #[arg(short, long)]
         minecraft: Option<PathBuf>,
+
+        /// Path to resource pack (ZIP file) for custom textures and models
+        #[arg(short, long)]
+        resource_pack: Option<PathBuf>,
     },
 
     /// Export to interactive HTML viewer (Three.js)
@@ -254,7 +258,7 @@ fn main() -> Result<()> {
         Commands::Export { file, output } => cmd_export(&file, &output)?,
         Commands::Materials { file, sort, verbose, limit } => cmd_materials(&file, sort, verbose, limit)?,
         Commands::Layer { file, y, ascii } => cmd_layer(&file, y, ascii)?,
-        Commands::RenderObj { file, output, hollow, greedy, models, textures, minecraft } => cmd_render_obj(&file, &output, hollow, greedy, models, textures, minecraft.as_deref())?,
+        Commands::RenderObj { file, output, hollow, greedy, models, textures, minecraft, resource_pack } => cmd_render_obj(&file, &output, hollow, greedy, models, textures, minecraft.as_deref(), resource_pack.as_deref())?,
         Commands::RenderHtml { file, output, max_blocks } => cmd_render_html(&file, &output, max_blocks)?,
         Commands::Debug { file } => cmd_debug(&file)?,
     }
@@ -792,7 +796,7 @@ fn cmd_layer(file: &PathBuf, y: u16, ascii: bool) -> Result<()> {
     Ok(())
 }
 
-fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, greedy: bool, use_models: bool, use_textures: bool, minecraft_path: Option<&std::path::Path>) -> Result<()> {
+fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, greedy: bool, use_models: bool, use_textures: bool, minecraft_path: Option<&std::path::Path>, resource_pack: Option<&std::path::Path>) -> Result<()> {
     let schem = UnifiedSchematic::load(file)?;
 
     println!("{}", "=== Exporting to OBJ ===".bold().cyan());
@@ -808,13 +812,24 @@ fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, greedy: bool, 
         println!("  Hollow mode: {}", if hollow { "yes (only visible faces)" } else { "no (all blocks)" });
     }
 
+    if let Some(rp) = resource_pack {
+        println!("  Resource pack: {}", rp.display().to_string().green());
+    }
+
     // Try to load textures if requested
     let textures = if use_textures {
         println!("  Textures: {}", "loading...".yellow());
-        let tm = schem_tool::textures::TextureManager::from_minecraft_with_path(minecraft_path);
+        let tm = schem_tool::textures::TextureManager::from_minecraft_with_path(minecraft_path, resource_pack);
         match tm {
             Some(tm) => {
-                println!("  Textures: {} textures loaded", tm.texture_count().to_string().green());
+                let rp_count = tm.resource_pack_texture_count();
+                if rp_count > 0 {
+                    println!("  Textures: {} vanilla + {} from resource pack",
+                        tm.texture_count().to_string().green(),
+                        rp_count.to_string().green());
+                } else {
+                    println!("  Textures: {} textures loaded", tm.texture_count().to_string().green());
+                }
                 Some(tm)
             }
             None => {
@@ -847,7 +862,7 @@ fn cmd_render_obj(file: &PathBuf, output: &PathBuf, hollow: bool, greedy: bool, 
                 .ok_or_else(|| anyhow::anyhow!("Could not find Minecraft client.jar"))?
         };
         println!("  Using models from: {}", jar_path.display());
-        schem_tool::export3d::export_obj_with_models(&schem, output, &jar_path, textures.as_ref())?;
+        schem_tool::export3d::export_obj_with_models(&schem, output, &jar_path, textures.as_ref(), resource_pack)?;
     } else if greedy {
         schem_tool::export3d::export_obj_greedy(&schem, output, textures.as_ref())?;
     } else {

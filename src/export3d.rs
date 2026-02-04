@@ -540,6 +540,7 @@ pub fn export_obj_with_models<P: AsRef<Path>>(
     obj_path: P,
     jar_path: &Path,
     textures: Option<&TextureManager>,
+    resource_pack: Option<&Path>,
 ) -> std::io::Result<()> {
     let obj_path = obj_path.as_ref();
     let mtl_path = obj_path.with_extension("mtl");
@@ -554,9 +555,9 @@ pub fn export_obj_with_models<P: AsRef<Path>>(
         None
     };
 
-    // Load models from jar
+    // Load models from jar with optional resource pack
     eprintln!("Loading Minecraft models from {:?}...", jar_path);
-    let mut model_manager = ModelManager::from_jar(jar_path)?;
+    let mut model_manager = ModelManager::from_jar_with_resource_pack(jar_path, resource_pack)?;
     eprintln!("Loaded {} blockstates and {} models",
               model_manager.blockstate_count(),
               model_manager.model_count());
