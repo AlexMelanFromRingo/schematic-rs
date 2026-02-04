@@ -280,6 +280,196 @@ fn neighbor_has_water(
     false
 }
 
+/// Check if neighbor position has lava
+fn neighbor_has_lava(
+    schematic: &UnifiedSchematic,
+    x: isize, y: isize, z: isize,
+    w: usize, h: usize, l: usize,
+) -> bool {
+    if x < 0 || y < 0 || z < 0 {
+        return false;
+    }
+    let (x, y, z) = (x as usize, y as usize, z as usize);
+    if x >= w || y >= h || z >= l {
+        return false;
+    }
+
+    if let Some(block) = schematic.get_block(x as u16, y as u16, z as u16) {
+        return block.name == "minecraft:lava" || block.name == "lava";
+    }
+    false
+}
+
+/// Generate lava quads with face culling
+fn generate_lava_quads_culled(
+    x: usize, y: usize, z: usize,
+    schematic: &UnifiedSchematic,
+    w: usize, h: usize, l: usize,
+) -> Vec<GeneratedQuad> {
+    let mut quads = Vec::new();
+
+    // Lava is also slightly below full block
+    let lava_height = 14.0 / 16.0;
+    let (xf, yf, zf) = (x as f32, y as f32, z as f32);
+    let y_top = yf + lava_height;
+    let y_bot = yf;
+    let x0 = xf;
+    let x1 = xf + 1.0;
+    let z0 = zf;
+    let z1 = zf + 1.0;
+
+    let xi = x as isize;
+    let yi = y as isize;
+    let zi = z as isize;
+
+    // Top face
+    if !neighbor_has_lava(schematic, xi, yi + 1, zi, w, h, l) {
+        quads.push(GeneratedQuad {
+            vertices: [(x0, y_top, z0), (x0, y_top, z1), (x1, y_top, z1), (x1, y_top, z0)],
+            uv_coords: [(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)],
+            texture: "block/lava_still".to_string(),
+            face_dir: mc_models::FaceDirection::Up,
+            tint_index: 0,
+        });
+    }
+
+    // Bottom face
+    if !neighbor_has_lava(schematic, xi, yi - 1, zi, w, h, l) {
+        quads.push(GeneratedQuad {
+            vertices: [(x0, y_bot, z1), (x0, y_bot, z0), (x1, y_bot, z0), (x1, y_bot, z1)],
+            uv_coords: [(0.0, 1.0), (0.0, 0.0), (1.0, 0.0), (1.0, 1.0)],
+            texture: "block/lava_still".to_string(),
+            face_dir: mc_models::FaceDirection::Down,
+            tint_index: 0,
+        });
+    }
+
+    // North face (Z-)
+    if !neighbor_has_lava(schematic, xi, yi, zi - 1, w, h, l) {
+        quads.push(GeneratedQuad {
+            vertices: [(x1, y_bot, z0), (x0, y_bot, z0), (x0, y_top, z0), (x1, y_top, z0)],
+            uv_coords: [(1.0, 1.0), (0.0, 1.0), (0.0, 0.0), (1.0, 0.0)],
+            texture: "block/lava_still".to_string(),
+            face_dir: mc_models::FaceDirection::North,
+            tint_index: 0,
+        });
+    }
+
+    // South face (Z+)
+    if !neighbor_has_lava(schematic, xi, yi, zi + 1, w, h, l) {
+        quads.push(GeneratedQuad {
+            vertices: [(x0, y_bot, z1), (x1, y_bot, z1), (x1, y_top, z1), (x0, y_top, z1)],
+            uv_coords: [(0.0, 1.0), (1.0, 1.0), (1.0, 0.0), (0.0, 0.0)],
+            texture: "block/lava_still".to_string(),
+            face_dir: mc_models::FaceDirection::South,
+            tint_index: 0,
+        });
+    }
+
+    // West face (X-)
+    if !neighbor_has_lava(schematic, xi - 1, yi, zi, w, h, l) {
+        quads.push(GeneratedQuad {
+            vertices: [(x0, y_bot, z0), (x0, y_bot, z1), (x0, y_top, z1), (x0, y_top, z0)],
+            uv_coords: [(0.0, 1.0), (1.0, 1.0), (1.0, 0.0), (0.0, 0.0)],
+            texture: "block/lava_still".to_string(),
+            face_dir: mc_models::FaceDirection::West,
+            tint_index: 0,
+        });
+    }
+
+    // East face (X+)
+    if !neighbor_has_lava(schematic, xi + 1, yi, zi, w, h, l) {
+        quads.push(GeneratedQuad {
+            vertices: [(x1, y_bot, z1), (x1, y_bot, z0), (x1, y_top, z0), (x1, y_top, z1)],
+            uv_coords: [(1.0, 1.0), (0.0, 1.0), (0.0, 0.0), (1.0, 0.0)],
+            texture: "block/lava_still".to_string(),
+            face_dir: mc_models::FaceDirection::East,
+            tint_index: 0,
+        });
+    }
+
+    quads
+}
+
+/// Generate liquid quads inside a cauldron
+/// level: 1, 2, or 3 (full)
+fn generate_cauldron_liquid_quads(
+    x: f32, y: f32, z: f32,
+    level: u8,
+    is_lava: bool,
+) -> Vec<GeneratedQuad> {
+    let mut quads = Vec::new();
+
+    // Cauldron inner dimensions (from model): 2/16 to 14/16 on X and Z
+    // Bottom at 4/16, liquid levels at 6/16, 9/16, 12/16 for levels 1,2,3
+    let inner_min = 2.0 / 16.0;
+    let inner_max = 14.0 / 16.0;
+    let bottom = 4.0 / 16.0;
+
+    let liquid_top = match level {
+        1 => 6.0 / 16.0,
+        2 => 9.0 / 16.0,
+        _ => 12.0 / 16.0, // level 3 or full
+    };
+
+    let x0 = x + inner_min;
+    let x1 = x + inner_max;
+    let z0 = z + inner_min;
+    let z1 = z + inner_max;
+    let y_bot = y + bottom;
+    let y_top = y + liquid_top;
+
+    let texture = if is_lava { "block/lava_still" } else { "block/water_still" };
+
+    // Top face (always visible - liquid surface)
+    quads.push(GeneratedQuad {
+        vertices: [(x0, y_top, z0), (x0, y_top, z1), (x1, y_top, z1), (x1, y_top, z0)],
+        uv_coords: [(0.0, 0.0), (0.0, 0.75), (0.75, 0.75), (0.75, 0.0)],
+        texture: texture.to_string(),
+        face_dir: mc_models::FaceDirection::Up,
+        tint_index: 0,
+    });
+
+    // Side faces (visible through cauldron gap)
+    // North
+    quads.push(GeneratedQuad {
+        vertices: [(x1, y_bot, z0), (x0, y_bot, z0), (x0, y_top, z0), (x1, y_top, z0)],
+        uv_coords: [(0.75, 0.5), (0.0, 0.5), (0.0, 0.0), (0.75, 0.0)],
+        texture: texture.to_string(),
+        face_dir: mc_models::FaceDirection::North,
+        tint_index: 0,
+    });
+
+    // South
+    quads.push(GeneratedQuad {
+        vertices: [(x0, y_bot, z1), (x1, y_bot, z1), (x1, y_top, z1), (x0, y_top, z1)],
+        uv_coords: [(0.0, 0.5), (0.75, 0.5), (0.75, 0.0), (0.0, 0.0)],
+        texture: texture.to_string(),
+        face_dir: mc_models::FaceDirection::South,
+        tint_index: 0,
+    });
+
+    // West
+    quads.push(GeneratedQuad {
+        vertices: [(x0, y_bot, z0), (x0, y_bot, z1), (x0, y_top, z1), (x0, y_top, z0)],
+        uv_coords: [(0.0, 0.5), (0.75, 0.5), (0.75, 0.0), (0.0, 0.0)],
+        texture: texture.to_string(),
+        face_dir: mc_models::FaceDirection::West,
+        tint_index: 0,
+    });
+
+    // East
+    quads.push(GeneratedQuad {
+        vertices: [(x1, y_bot, z1), (x1, y_bot, z0), (x1, y_top, z0), (x1, y_top, z1)],
+        uv_coords: [(0.75, 0.5), (0.0, 0.5), (0.0, 0.0), (0.75, 0.0)],
+        texture: texture.to_string(),
+        face_dir: mc_models::FaceDirection::East,
+        tint_index: 0,
+    });
+
+    quads
+}
+
 /// Generate water quads with face culling based on neighbors
 fn generate_water_quads_culled(
     x: usize, y: usize, z: usize,
@@ -726,6 +916,40 @@ pub fn export_obj_with_models<P: AsRef<Path>>(
                     continue;
                 }
 
+                // Handle lava blocks
+                let is_lava_block = block.name == "minecraft:lava" || block.name == "lava";
+                if is_lava_block {
+                    let lava_quads = generate_lava_quads_culled(x, y, z, schematic, w, h, l);
+                    for quad in lava_quads {
+                        all_quads.push((quad, "lava_still".to_string()));
+                    }
+                    continue;
+                }
+
+                // Handle cauldrons with liquids
+                let is_water_cauldron = block.name == "minecraft:water_cauldron";
+                let is_lava_cauldron = block.name == "minecraft:lava_cauldron";
+                if is_water_cauldron || is_lava_cauldron {
+                    // Get level (default to 3 = full)
+                    let level: u8 = block.state.properties
+                        .get("level")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(3);
+
+                    if level > 0 {
+                        let liquid_quads = generate_cauldron_liquid_quads(
+                            x as f32, y as f32, z as f32,
+                            level,
+                            is_lava_cauldron,
+                        );
+                        let mat_name = if is_lava_cauldron { "lava_still" } else { "water_still" };
+                        for quad in liquid_quads {
+                            all_quads.push((quad, mat_name.to_string()));
+                        }
+                    }
+                    // Continue to render the cauldron itself
+                }
+
                 // Get models for this block from JSON
                 let model_refs = model_manager.get_models_for_block(&block.name, &block.state.properties);
 
@@ -822,6 +1046,20 @@ pub fn export_obj_with_models<P: AsRef<Path>>(
         } else { None };
         // Water color (blue tint)
         materials.insert("water_still".to_string(), (0.2, 0.4, 0.8, 0.6, texture_file));
+    }
+
+    // Ensure lava material exists
+    if !materials.contains_key("lava_still") {
+        let texture_file = if let (Some(tex_mgr), Some(tex_out_dir)) = (textures, &tex_dir) {
+            if let Some(tex_path) = tex_mgr.get_texture("lava_still") {
+                let dest = tex_out_dir.join("lava_still.png");
+                if std::fs::copy(tex_path, &dest).is_ok() {
+                    Some("textures/lava_still.png".to_string())
+                } else { None }
+            } else { None }
+        } else { None };
+        // Lava color (orange/red glow)
+        materials.insert("lava_still".to_string(), (0.9, 0.45, 0.1, 0.95, texture_file));
     }
 
     // Write materials
