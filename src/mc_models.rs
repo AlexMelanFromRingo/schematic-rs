@@ -673,6 +673,44 @@ pub struct GeneratedQuad {
     pub tint_index: i32,
 }
 
+/// Apply element rotation around an origin point
+fn apply_element_rotation(
+    point: (f32, f32, f32),
+    rotation: &ElementRotation,
+) -> (f32, f32, f32) {
+    let (mut x, mut y, mut z) = point;
+    let (ox, oy, oz) = rotation.origin.to_unit_scale();
+
+    // Translate to origin
+    x -= ox;
+    y -= oy;
+    z -= oz;
+
+    // Convert angle to radians
+    let angle_rad = rotation.angle.to_radians();
+    let cos_a = angle_rad.cos();
+    let sin_a = angle_rad.sin();
+
+    // Apply rotation based on axis
+    let (nx, ny, nz) = match rotation.axis.as_str() {
+        "x" => (x, y * cos_a - z * sin_a, y * sin_a + z * cos_a),
+        "y" => (x * cos_a + z * sin_a, y, -x * sin_a + z * cos_a),
+        "z" => (x * cos_a - y * sin_a, x * sin_a + y * cos_a, z),
+        _ => (x, y, z),
+    };
+
+    // Rescale if needed (to maintain bounding box)
+    let (fx, fy, fz) = if rotation.rescale {
+        let scale = 1.0 / cos_a.abs().max(0.001);
+        (nx * scale, ny * scale, nz * scale)
+    } else {
+        (nx, ny, nz)
+    };
+
+    // Translate back
+    (fx + ox, fy + oy, fz + oz)
+}
+
 /// Generate quads from a resolved model with rotation applied
 pub fn generate_model_quads(
     model: &ResolvedModel,
@@ -688,9 +726,6 @@ pub fn generate_model_quads(
         // Get element bounds in unit scale (0-1)
         let (x0, y0, z0) = element.from.to_unit_scale();
         let (x1, y1, z1) = element.to.to_unit_scale();
-
-        // Apply element rotation if present
-        // TODO: handle element.rotation (rarely used)
 
         // Generate quad for each face
         for (face_name, face) in &element.faces {
@@ -739,12 +774,24 @@ pub fn generate_model_quads(
                 ],
             };
 
+            // Apply element rotation if present (e.g., 45° for cross models)
+            let element_rotated = if let Some(ref rot) = element.rotation {
+                [
+                    apply_element_rotation(local_verts[0], rot),
+                    apply_element_rotation(local_verts[1], rot),
+                    apply_element_rotation(local_verts[2], rot),
+                    apply_element_rotation(local_verts[3], rot),
+                ]
+            } else {
+                local_verts
+            };
+
             // Apply model rotation (x_rot, y_rot from blockstate)
             let mut rotated_verts: [(f32, f32, f32); 4] = [
-                rotate_point(local_verts[0], x_rot, y_rot),
-                rotate_point(local_verts[1], x_rot, y_rot),
-                rotate_point(local_verts[2], x_rot, y_rot),
-                rotate_point(local_verts[3], x_rot, y_rot),
+                rotate_point(element_rotated[0], x_rot, y_rot),
+                rotate_point(element_rotated[1], x_rot, y_rot),
+                rotate_point(element_rotated[2], x_rot, y_rot),
+                rotate_point(element_rotated[3], x_rot, y_rot),
             ];
 
             // 180-degree rotations flip the winding order (improper rotation)

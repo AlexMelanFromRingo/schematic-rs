@@ -251,6 +251,28 @@ fn get_block_transparency(name: &str) -> f32 {
     }
 }
 
+/// Check if a texture likely has alpha transparency (for MTL map_d)
+fn is_transparent_texture(name: &str) -> bool {
+    let n = name.to_lowercase();
+    // Plants, flowers, saplings, crops, vines, etc.
+    n.contains("flower") || n.contains("dandelion") || n.contains("poppy") ||
+    n.contains("orchid") || n.contains("allium") || n.contains("tulip") ||
+    n.contains("daisy") || n.contains("cornflower") || n.contains("lily") ||
+    n.contains("rose") || n.contains("sunflower") || n.contains("lilac") ||
+    n.contains("peony") || n.contains("sapling") || n.contains("azalea") ||
+    n.contains("fern") || n.contains("grass") && !n.contains("block") ||
+    n.contains("seagrass") || n.contains("kelp") || n.contains("vine") ||
+    n.contains("wheat") || n.contains("carrot") || n.contains("potato") ||
+    n.contains("beetroot") || n.contains("melon_stem") || n.contains("pumpkin_stem") ||
+    n.contains("sugar_cane") || n.contains("bamboo") || n.contains("cactus") ||
+    n.contains("dead_bush") || n.contains("sweet_berry") || n.contains("glow_berry") ||
+    n.contains("nether_sprouts") || n.contains("crimson_roots") || n.contains("warped_roots") ||
+    n.contains("torch") || n.contains("lantern") || n.contains("candle") ||
+    n.contains("rail") || n.contains("lever") || n.contains("tripwire") ||
+    n.contains("cobweb") || n.contains("ladder") || n.contains("chain") ||
+    n.contains("iron_bars") || n.contains("glass_pane") || n.contains("leaves")
+}
+
 /// Check if a block covers a specific face (used for face culling)
 /// Uses the block_geometry module for accurate geometry data
 #[inline]
@@ -661,9 +683,18 @@ pub fn export_obj_with_models<P: AsRef<Path>>(
             writeln!(mtl_file, "Ns 10.0")?;
         }
         writeln!(mtl_file, "d {}", opacity)?;
-        writeln!(mtl_file, "illum 2")?;
+        // Check if texture likely has alpha channel
+        let has_alpha = is_transparent_texture(name);
+        if has_alpha {
+            writeln!(mtl_file, "illum 4")?;  // Transparency with raytracing
+        } else {
+            writeln!(mtl_file, "illum 2")?;
+        }
         if let Some(tex) = tex_file {
             writeln!(mtl_file, "map_Kd {}", tex)?;
+            if has_alpha {
+                writeln!(mtl_file, "map_d {}", tex)?;  // Alpha map
+            }
         }
         writeln!(mtl_file)?;
     }
@@ -817,9 +848,18 @@ fn export_obj_internal<P: AsRef<Path>>(
             writeln!(mtl_file, "Ns 10.0")?;
         }
         writeln!(mtl_file, "d {}", opacity)?;
-        writeln!(mtl_file, "illum 2")?;
+        // Check if texture likely has alpha channel
+        let has_alpha = is_transparent_texture(name);
+        if has_alpha {
+            writeln!(mtl_file, "illum 4")?;  // Transparency with raytracing
+        } else {
+            writeln!(mtl_file, "illum 2")?;
+        }
         if let Some(tex) = tex_file {
             writeln!(mtl_file, "map_Kd {}", tex)?;
+            if has_alpha {
+                writeln!(mtl_file, "map_d {}", tex)?;  // Alpha map
+            }
         }
         writeln!(mtl_file)?;
     }
