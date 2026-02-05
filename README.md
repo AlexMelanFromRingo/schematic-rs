@@ -13,11 +13,16 @@ Supports multiple formats:
 - **Analyze** block composition, dimensions, metadata
 - **Search** for specific blocks by name
 - **Calculate** raw materials needed (breaks down crafted items)
+- **Stonecutter mode** for efficient 1:1 material ratios
 - **Extract** sign text and block entity data
 - **Visualize** layer-by-layer ASCII/Unicode view
 - **Export** to OBJ 3D model with textures support
+- **JSON models** — accurate Minecraft block geometry from client.jar
+- **Resource packs** — custom textures and models support
 - **Greedy meshing** for dramatically smaller OBJ files (10-100x reduction)
+- **Water rendering** — waterlogged blocks, water/lava, cauldron liquids
 - **Texture extraction** from Minecraft installation with proper tiling
+- **Memory optimized** — streaming export for massive schematics (33M+ blocks)
 - **Interactive HTML viewer** using Three.js
 - **Debug** raw NBT structure
 
@@ -73,10 +78,15 @@ schem-tool blocks -ns -l 10 my_build.schem
 
 ### Calculate Materials
 ```bash
+# Standard crafting table ratios
 schem-tool materials -s my_build.schem
+
+# Stonecutter mode (more efficient 1:1 ratios for stairs/slabs)
+schem-tool materials -s --stonecutter my_build.schem
 ```
 
-Breaks down crafted items into raw materials:
+Breaks down crafted items into raw materials. Supports all 16 color variants (concrete, terracotta, wool, glass, beds, banners, carpets, candles, shulker boxes).
+
 ```
 === Raw Materials Needed ===
 
@@ -89,6 +99,11 @@ Breaks down crafted items into raw materials:
 │ red_dye        │ 1000     │ 15 + 40       │
 ╰────────────────┴──────────┴───────────────╯
 ```
+
+The `--stonecutter` flag uses stonecutter recipes which are more efficient:
+- Stairs: 1 block = 1 stair (vs 6 blocks = 4 stairs with crafting)
+- Slabs: 1 block = 2 slabs (vs 3 blocks = 6 slabs)
+- Walls: 1 block = 1 wall (vs 6 blocks = 6 walls)
 
 ### Search Blocks
 ```bash
@@ -115,6 +130,14 @@ schem-tool render-obj my_build.schem -o model.obj --greedy
 
 # Export with textures from Minecraft installation
 schem-tool render-obj my_build.schem -o model.obj --greedy --textures
+
+# Export with JSON models (accurate Minecraft geometry)
+schem-tool render-obj my_build.schem -o model.obj --models --textures \
+    --minecraft /path/to/minecraft-client.jar
+
+# With custom resource pack
+schem-tool render-obj my_build.schem -o model.obj --models --textures \
+    --minecraft /path/to/client.jar --resource-pack my_pack.zip
 
 # Specify custom Minecraft path or client.jar
 schem-tool render-obj my_build.schem -o model.obj --greedy --textures -m ~/.minecraft
@@ -151,6 +174,32 @@ Materials with transparency are exported with correct opacity values:
 - **Water** — 40% opacity
 
 This allows proper rendering in Blender and other 3D software when using transparency-aware materials.
+
+#### JSON Models
+
+The `--models` flag enables accurate block geometry using Minecraft's native JSON model format:
+- Extracts blockstates and models from client.jar
+- Supports model inheritance (parent models)
+- Handles element rotation (45° crosses, etc.)
+- Proper UV mapping from model definitions
+- Memory-optimized streaming for massive schematics (33M+ blocks)
+
+Requires `--minecraft` to point to a Minecraft client.jar file.
+
+#### Resource Packs
+
+The `--resource-pack` flag loads custom textures and models from a resource pack ZIP:
+- Overrides vanilla textures with pack textures
+- Loads custom blockstates and models
+- Supports standard Minecraft resource pack format
+
+#### Water and Liquids
+
+Liquid rendering is automatic when using `--models`:
+- **Water blocks** with face culling against neighbors
+- **Waterlogged blocks** (stairs, slabs, fences, etc.)
+- **Lava blocks** with proper orange glow
+- **Cauldron liquids** at correct fill levels
 
 #### Textures
 

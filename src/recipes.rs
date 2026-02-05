@@ -1129,6 +1129,233 @@ pub fn get_recipes() -> HashMap<&'static str, Recipe> {
             output_count: 4,
             ingredients: &[("minecraft:stick", 1), ("minecraft:coal", 1), ("minecraft:soul_sand", 1)],
         },
+
+        // === Colored Concrete (16 colors) ===
+        // Concrete is made by dropping concrete powder into water
+        Recipe { output: "minecraft:white_concrete", output_count: 1, ingredients: &[("minecraft:white_concrete_powder", 1)] },
+        Recipe { output: "minecraft:orange_concrete", output_count: 1, ingredients: &[("minecraft:orange_concrete_powder", 1)] },
+        Recipe { output: "minecraft:magenta_concrete", output_count: 1, ingredients: &[("minecraft:magenta_concrete_powder", 1)] },
+        Recipe { output: "minecraft:light_blue_concrete", output_count: 1, ingredients: &[("minecraft:light_blue_concrete_powder", 1)] },
+        Recipe { output: "minecraft:yellow_concrete", output_count: 1, ingredients: &[("minecraft:yellow_concrete_powder", 1)] },
+        Recipe { output: "minecraft:lime_concrete", output_count: 1, ingredients: &[("minecraft:lime_concrete_powder", 1)] },
+        Recipe { output: "minecraft:pink_concrete", output_count: 1, ingredients: &[("minecraft:pink_concrete_powder", 1)] },
+        Recipe { output: "minecraft:gray_concrete", output_count: 1, ingredients: &[("minecraft:gray_concrete_powder", 1)] },
+        Recipe { output: "minecraft:light_gray_concrete", output_count: 1, ingredients: &[("minecraft:light_gray_concrete_powder", 1)] },
+        Recipe { output: "minecraft:cyan_concrete", output_count: 1, ingredients: &[("minecraft:cyan_concrete_powder", 1)] },
+        Recipe { output: "minecraft:purple_concrete", output_count: 1, ingredients: &[("minecraft:purple_concrete_powder", 1)] },
+        Recipe { output: "minecraft:blue_concrete", output_count: 1, ingredients: &[("minecraft:blue_concrete_powder", 1)] },
+        Recipe { output: "minecraft:brown_concrete", output_count: 1, ingredients: &[("minecraft:brown_concrete_powder", 1)] },
+        Recipe { output: "minecraft:green_concrete", output_count: 1, ingredients: &[("minecraft:green_concrete_powder", 1)] },
+        Recipe { output: "minecraft:red_concrete", output_count: 1, ingredients: &[("minecraft:red_concrete_powder", 1)] },
+        Recipe { output: "minecraft:black_concrete", output_count: 1, ingredients: &[("minecraft:black_concrete_powder", 1)] },
+
+        // === Concrete Powder (4 sand + 4 gravel + 1 dye = 8 powder) ===
+        Recipe { output: "minecraft:white_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:white_dye", 1)] },
+        Recipe { output: "minecraft:orange_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:orange_dye", 1)] },
+        Recipe { output: "minecraft:magenta_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:magenta_dye", 1)] },
+        Recipe { output: "minecraft:light_blue_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:light_blue_dye", 1)] },
+        Recipe { output: "minecraft:yellow_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:yellow_dye", 1)] },
+        Recipe { output: "minecraft:lime_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:lime_dye", 1)] },
+        Recipe { output: "minecraft:pink_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:pink_dye", 1)] },
+        Recipe { output: "minecraft:gray_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:gray_dye", 1)] },
+        Recipe { output: "minecraft:light_gray_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:light_gray_dye", 1)] },
+        Recipe { output: "minecraft:cyan_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:cyan_dye", 1)] },
+        Recipe { output: "minecraft:purple_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:purple_dye", 1)] },
+        Recipe { output: "minecraft:blue_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:blue_dye", 1)] },
+        Recipe { output: "minecraft:brown_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:brown_dye", 1)] },
+        Recipe { output: "minecraft:green_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:green_dye", 1)] },
+        Recipe { output: "minecraft:red_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:red_dye", 1)] },
+        Recipe { output: "minecraft:black_concrete_powder", output_count: 8, ingredients: &[("minecraft:sand", 4), ("minecraft:gravel", 4), ("minecraft:black_dye", 1)] },
+
+        // === Colored Terracotta (8 terracotta + 1 dye = 8 colored) ===
+        Recipe { output: "minecraft:white_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:white_dye", 1)] },
+        Recipe { output: "minecraft:orange_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:orange_dye", 1)] },
+        Recipe { output: "minecraft:magenta_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:magenta_dye", 1)] },
+        Recipe { output: "minecraft:light_blue_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:light_blue_dye", 1)] },
+        Recipe { output: "minecraft:yellow_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:yellow_dye", 1)] },
+        Recipe { output: "minecraft:lime_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:lime_dye", 1)] },
+        Recipe { output: "minecraft:pink_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:pink_dye", 1)] },
+        Recipe { output: "minecraft:gray_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:gray_dye", 1)] },
+        Recipe { output: "minecraft:light_gray_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:light_gray_dye", 1)] },
+        Recipe { output: "minecraft:cyan_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:cyan_dye", 1)] },
+        Recipe { output: "minecraft:purple_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:purple_dye", 1)] },
+        Recipe { output: "minecraft:blue_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:blue_dye", 1)] },
+        Recipe { output: "minecraft:brown_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:brown_dye", 1)] },
+        Recipe { output: "minecraft:green_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:green_dye", 1)] },
+        Recipe { output: "minecraft:red_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:red_dye", 1)] },
+        Recipe { output: "minecraft:black_terracotta", output_count: 8, ingredients: &[("minecraft:terracotta", 8), ("minecraft:black_dye", 1)] },
+
+        // Base terracotta from clay
+        Recipe { output: "minecraft:terracotta", output_count: 1, ingredients: &[("minecraft:clay", 1)] }, // smelting
+
+        // === Glazed Terracotta (smelting colored terracotta) ===
+        Recipe { output: "minecraft:white_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:white_terracotta", 1)] },
+        Recipe { output: "minecraft:orange_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:orange_terracotta", 1)] },
+        Recipe { output: "minecraft:magenta_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:magenta_terracotta", 1)] },
+        Recipe { output: "minecraft:light_blue_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:light_blue_terracotta", 1)] },
+        Recipe { output: "minecraft:yellow_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:yellow_terracotta", 1)] },
+        Recipe { output: "minecraft:lime_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:lime_terracotta", 1)] },
+        Recipe { output: "minecraft:pink_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:pink_terracotta", 1)] },
+        Recipe { output: "minecraft:gray_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:gray_terracotta", 1)] },
+        Recipe { output: "minecraft:light_gray_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:light_gray_terracotta", 1)] },
+        Recipe { output: "minecraft:cyan_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:cyan_terracotta", 1)] },
+        Recipe { output: "minecraft:purple_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:purple_terracotta", 1)] },
+        Recipe { output: "minecraft:blue_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:blue_terracotta", 1)] },
+        Recipe { output: "minecraft:brown_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:brown_terracotta", 1)] },
+        Recipe { output: "minecraft:green_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:green_terracotta", 1)] },
+        Recipe { output: "minecraft:red_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:red_terracotta", 1)] },
+        Recipe { output: "minecraft:black_glazed_terracotta", output_count: 1, ingredients: &[("minecraft:black_terracotta", 1)] },
+
+        // === Colored Wool (1 wool + 1 dye = 1 colored wool) ===
+        Recipe { output: "minecraft:orange_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:orange_dye", 1)] },
+        Recipe { output: "minecraft:magenta_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:magenta_dye", 1)] },
+        Recipe { output: "minecraft:light_blue_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:light_blue_dye", 1)] },
+        Recipe { output: "minecraft:yellow_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:yellow_dye", 1)] },
+        Recipe { output: "minecraft:lime_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:lime_dye", 1)] },
+        Recipe { output: "minecraft:pink_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:pink_dye", 1)] },
+        Recipe { output: "minecraft:gray_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:gray_dye", 1)] },
+        Recipe { output: "minecraft:light_gray_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:light_gray_dye", 1)] },
+        Recipe { output: "minecraft:cyan_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:cyan_dye", 1)] },
+        Recipe { output: "minecraft:purple_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:purple_dye", 1)] },
+        Recipe { output: "minecraft:blue_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:blue_dye", 1)] },
+        Recipe { output: "minecraft:brown_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:brown_dye", 1)] },
+        Recipe { output: "minecraft:green_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:green_dye", 1)] },
+        Recipe { output: "minecraft:red_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:red_dye", 1)] },
+        Recipe { output: "minecraft:black_wool", output_count: 1, ingredients: &[("minecraft:white_wool", 1), ("minecraft:black_dye", 1)] },
+
+        // === Colored Stained Glass (8 glass + 1 dye = 8 stained) ===
+        Recipe { output: "minecraft:white_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:white_dye", 1)] },
+        Recipe { output: "minecraft:orange_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:orange_dye", 1)] },
+        Recipe { output: "minecraft:magenta_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:magenta_dye", 1)] },
+        Recipe { output: "minecraft:light_blue_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:light_blue_dye", 1)] },
+        Recipe { output: "minecraft:yellow_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:yellow_dye", 1)] },
+        Recipe { output: "minecraft:lime_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:lime_dye", 1)] },
+        Recipe { output: "minecraft:pink_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:pink_dye", 1)] },
+        Recipe { output: "minecraft:gray_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:gray_dye", 1)] },
+        Recipe { output: "minecraft:light_gray_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:light_gray_dye", 1)] },
+        Recipe { output: "minecraft:cyan_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:cyan_dye", 1)] },
+        Recipe { output: "minecraft:purple_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:purple_dye", 1)] },
+        Recipe { output: "minecraft:blue_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:blue_dye", 1)] },
+        Recipe { output: "minecraft:brown_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:brown_dye", 1)] },
+        Recipe { output: "minecraft:green_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:green_dye", 1)] },
+        Recipe { output: "minecraft:red_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:red_dye", 1)] },
+        Recipe { output: "minecraft:black_stained_glass", output_count: 8, ingredients: &[("minecraft:glass", 8), ("minecraft:black_dye", 1)] },
+
+        // Base glass from sand
+        Recipe { output: "minecraft:glass", output_count: 1, ingredients: &[("minecraft:sand", 1)] }, // smelting
+
+        // === Stained Glass Panes (6 stained glass = 16 panes) ===
+        Recipe { output: "minecraft:white_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:white_stained_glass", 6)] },
+        Recipe { output: "minecraft:orange_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:orange_stained_glass", 6)] },
+        Recipe { output: "minecraft:magenta_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:magenta_stained_glass", 6)] },
+        Recipe { output: "minecraft:light_blue_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:light_blue_stained_glass", 6)] },
+        Recipe { output: "minecraft:yellow_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:yellow_stained_glass", 6)] },
+        Recipe { output: "minecraft:lime_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:lime_stained_glass", 6)] },
+        Recipe { output: "minecraft:pink_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:pink_stained_glass", 6)] },
+        Recipe { output: "minecraft:gray_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:gray_stained_glass", 6)] },
+        Recipe { output: "minecraft:light_gray_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:light_gray_stained_glass", 6)] },
+        Recipe { output: "minecraft:cyan_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:cyan_stained_glass", 6)] },
+        Recipe { output: "minecraft:purple_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:purple_stained_glass", 6)] },
+        Recipe { output: "minecraft:blue_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:blue_stained_glass", 6)] },
+        Recipe { output: "minecraft:brown_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:brown_stained_glass", 6)] },
+        Recipe { output: "minecraft:green_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:green_stained_glass", 6)] },
+        Recipe { output: "minecraft:red_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:red_stained_glass", 6)] },
+        Recipe { output: "minecraft:black_stained_glass_pane", output_count: 16, ingredients: &[("minecraft:black_stained_glass", 6)] },
+
+        // Regular glass pane
+        Recipe { output: "minecraft:glass_pane", output_count: 16, ingredients: &[("minecraft:glass", 6)] },
+
+        // === Beds (3 wool + 3 planks = 1 bed) ===
+        Recipe { output: "minecraft:white_bed", output_count: 1, ingredients: &[("minecraft:white_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:orange_bed", output_count: 1, ingredients: &[("minecraft:orange_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:magenta_bed", output_count: 1, ingredients: &[("minecraft:magenta_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:light_blue_bed", output_count: 1, ingredients: &[("minecraft:light_blue_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:yellow_bed", output_count: 1, ingredients: &[("minecraft:yellow_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:lime_bed", output_count: 1, ingredients: &[("minecraft:lime_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:pink_bed", output_count: 1, ingredients: &[("minecraft:pink_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:gray_bed", output_count: 1, ingredients: &[("minecraft:gray_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:light_gray_bed", output_count: 1, ingredients: &[("minecraft:light_gray_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:cyan_bed", output_count: 1, ingredients: &[("minecraft:cyan_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:purple_bed", output_count: 1, ingredients: &[("minecraft:purple_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:blue_bed", output_count: 1, ingredients: &[("minecraft:blue_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:brown_bed", output_count: 1, ingredients: &[("minecraft:brown_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:green_bed", output_count: 1, ingredients: &[("minecraft:green_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:red_bed", output_count: 1, ingredients: &[("minecraft:red_wool", 3), ("minecraft:any_planks", 3)] },
+        Recipe { output: "minecraft:black_bed", output_count: 1, ingredients: &[("minecraft:black_wool", 3), ("minecraft:any_planks", 3)] },
+
+        // === Banners (6 wool + 1 stick = 1 banner) ===
+        Recipe { output: "minecraft:white_banner", output_count: 1, ingredients: &[("minecraft:white_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:orange_banner", output_count: 1, ingredients: &[("minecraft:orange_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:magenta_banner", output_count: 1, ingredients: &[("minecraft:magenta_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:light_blue_banner", output_count: 1, ingredients: &[("minecraft:light_blue_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:yellow_banner", output_count: 1, ingredients: &[("minecraft:yellow_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:lime_banner", output_count: 1, ingredients: &[("minecraft:lime_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:pink_banner", output_count: 1, ingredients: &[("minecraft:pink_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:gray_banner", output_count: 1, ingredients: &[("minecraft:gray_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:light_gray_banner", output_count: 1, ingredients: &[("minecraft:light_gray_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:cyan_banner", output_count: 1, ingredients: &[("minecraft:cyan_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:purple_banner", output_count: 1, ingredients: &[("minecraft:purple_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:blue_banner", output_count: 1, ingredients: &[("minecraft:blue_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:brown_banner", output_count: 1, ingredients: &[("minecraft:brown_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:green_banner", output_count: 1, ingredients: &[("minecraft:green_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:red_banner", output_count: 1, ingredients: &[("minecraft:red_wool", 6), ("minecraft:stick", 1)] },
+        Recipe { output: "minecraft:black_banner", output_count: 1, ingredients: &[("minecraft:black_wool", 6), ("minecraft:stick", 1)] },
+
+        // === Carpets (2 wool = 3 carpet) ===
+        Recipe { output: "minecraft:white_carpet", output_count: 3, ingredients: &[("minecraft:white_wool", 2)] },
+        Recipe { output: "minecraft:orange_carpet", output_count: 3, ingredients: &[("minecraft:orange_wool", 2)] },
+        Recipe { output: "minecraft:magenta_carpet", output_count: 3, ingredients: &[("minecraft:magenta_wool", 2)] },
+        Recipe { output: "minecraft:light_blue_carpet", output_count: 3, ingredients: &[("minecraft:light_blue_wool", 2)] },
+        Recipe { output: "minecraft:yellow_carpet", output_count: 3, ingredients: &[("minecraft:yellow_wool", 2)] },
+        Recipe { output: "minecraft:lime_carpet", output_count: 3, ingredients: &[("minecraft:lime_wool", 2)] },
+        Recipe { output: "minecraft:pink_carpet", output_count: 3, ingredients: &[("minecraft:pink_wool", 2)] },
+        Recipe { output: "minecraft:gray_carpet", output_count: 3, ingredients: &[("minecraft:gray_wool", 2)] },
+        Recipe { output: "minecraft:light_gray_carpet", output_count: 3, ingredients: &[("minecraft:light_gray_wool", 2)] },
+        Recipe { output: "minecraft:cyan_carpet", output_count: 3, ingredients: &[("minecraft:cyan_wool", 2)] },
+        Recipe { output: "minecraft:purple_carpet", output_count: 3, ingredients: &[("minecraft:purple_wool", 2)] },
+        Recipe { output: "minecraft:blue_carpet", output_count: 3, ingredients: &[("minecraft:blue_wool", 2)] },
+        Recipe { output: "minecraft:brown_carpet", output_count: 3, ingredients: &[("minecraft:brown_wool", 2)] },
+        Recipe { output: "minecraft:green_carpet", output_count: 3, ingredients: &[("minecraft:green_wool", 2)] },
+        Recipe { output: "minecraft:red_carpet", output_count: 3, ingredients: &[("minecraft:red_wool", 2)] },
+        Recipe { output: "minecraft:black_carpet", output_count: 3, ingredients: &[("minecraft:black_wool", 2)] },
+
+        // === Candles (1 string + 1 honeycomb = 1 candle) ===
+        Recipe { output: "minecraft:candle", output_count: 1, ingredients: &[("minecraft:string", 1), ("minecraft:honeycomb", 1)] },
+        Recipe { output: "minecraft:white_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:white_dye", 1)] },
+        Recipe { output: "minecraft:orange_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:orange_dye", 1)] },
+        Recipe { output: "minecraft:magenta_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:magenta_dye", 1)] },
+        Recipe { output: "minecraft:light_blue_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:light_blue_dye", 1)] },
+        Recipe { output: "minecraft:yellow_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:yellow_dye", 1)] },
+        Recipe { output: "minecraft:lime_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:lime_dye", 1)] },
+        Recipe { output: "minecraft:pink_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:pink_dye", 1)] },
+        Recipe { output: "minecraft:gray_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:gray_dye", 1)] },
+        Recipe { output: "minecraft:light_gray_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:light_gray_dye", 1)] },
+        Recipe { output: "minecraft:cyan_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:cyan_dye", 1)] },
+        Recipe { output: "minecraft:purple_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:purple_dye", 1)] },
+        Recipe { output: "minecraft:blue_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:blue_dye", 1)] },
+        Recipe { output: "minecraft:brown_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:brown_dye", 1)] },
+        Recipe { output: "minecraft:green_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:green_dye", 1)] },
+        Recipe { output: "minecraft:red_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:red_dye", 1)] },
+        Recipe { output: "minecraft:black_candle", output_count: 1, ingredients: &[("minecraft:candle", 1), ("minecraft:black_dye", 1)] },
+
+        // === Shulker Boxes (1 chest + 2 shulker shells = 1 shulker box) ===
+        Recipe { output: "minecraft:shulker_box", output_count: 1, ingredients: &[("minecraft:chest", 1), ("minecraft:shulker_shell", 2)] },
+        Recipe { output: "minecraft:white_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:white_dye", 1)] },
+        Recipe { output: "minecraft:orange_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:orange_dye", 1)] },
+        Recipe { output: "minecraft:magenta_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:magenta_dye", 1)] },
+        Recipe { output: "minecraft:light_blue_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:light_blue_dye", 1)] },
+        Recipe { output: "minecraft:yellow_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:yellow_dye", 1)] },
+        Recipe { output: "minecraft:lime_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:lime_dye", 1)] },
+        Recipe { output: "minecraft:pink_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:pink_dye", 1)] },
+        Recipe { output: "minecraft:gray_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:gray_dye", 1)] },
+        Recipe { output: "minecraft:light_gray_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:light_gray_dye", 1)] },
+        Recipe { output: "minecraft:cyan_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:cyan_dye", 1)] },
+        Recipe { output: "minecraft:purple_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:purple_dye", 1)] },
+        Recipe { output: "minecraft:blue_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:blue_dye", 1)] },
+        Recipe { output: "minecraft:brown_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:brown_dye", 1)] },
+        Recipe { output: "minecraft:green_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:green_dye", 1)] },
+        Recipe { output: "minecraft:red_shulker_box", output_count: 1, ingredients: &[("minecraft:shulker_box", 1), ("minecraft:red_dye", 1)] },
+        Recipe { output: "minecraft:black_shulker_box", output_count: 1, ingredients: &[("minecraft:black_dye", 1), ("minecraft:shulker_box", 1)] },
     ];
 
     recipes.into_iter().map(|r| (r.output, r)).collect()
@@ -1251,13 +1478,191 @@ pub fn is_raw_material(name: &str) -> bool {
         // Special
         "minecraft:bow" |
         "minecraft:stick" |
-        "minecraft:book"
+        "minecraft:book" |
+
+        // Wool (white is base, obtained from sheep)
+        "minecraft:white_wool" |
+
+        // Clay (mined from clay blocks)
+        "minecraft:clay" |
+
+        // Honeycomb (from bee nests)
+        "minecraft:honeycomb" |
+
+        // Shulker shell (from shulkers)
+        "minecraft:shulker_shell"
     )
+}
+
+/// Get stonecutter recipes (1:1 ratios for stairs/slabs)
+/// Stonecutter is more efficient than crafting table
+pub fn get_stonecutter_recipes() -> HashMap<&'static str, Recipe> {
+    let recipes: Vec<Recipe> = vec![
+        // Stone stairs and slabs (1:1 with stonecutter)
+        Recipe { output: "minecraft:stone_stairs", output_count: 1, ingredients: &[("minecraft:stone", 1)] },
+        Recipe { output: "minecraft:stone_slab", output_count: 2, ingredients: &[("minecraft:stone", 1)] },
+        Recipe { output: "minecraft:cobblestone_stairs", output_count: 1, ingredients: &[("minecraft:cobblestone", 1)] },
+        Recipe { output: "minecraft:cobblestone_slab", output_count: 2, ingredients: &[("minecraft:cobblestone", 1)] },
+        Recipe { output: "minecraft:cobblestone_wall", output_count: 1, ingredients: &[("minecraft:cobblestone", 1)] },
+        Recipe { output: "minecraft:mossy_cobblestone_stairs", output_count: 1, ingredients: &[("minecraft:mossy_cobblestone", 1)] },
+        Recipe { output: "minecraft:mossy_cobblestone_slab", output_count: 2, ingredients: &[("minecraft:mossy_cobblestone", 1)] },
+        Recipe { output: "minecraft:mossy_cobblestone_wall", output_count: 1, ingredients: &[("minecraft:mossy_cobblestone", 1)] },
+        Recipe { output: "minecraft:stone_brick_stairs", output_count: 1, ingredients: &[("minecraft:stone_bricks", 1)] },
+        Recipe { output: "minecraft:stone_brick_slab", output_count: 2, ingredients: &[("minecraft:stone_bricks", 1)] },
+        Recipe { output: "minecraft:stone_brick_wall", output_count: 1, ingredients: &[("minecraft:stone_bricks", 1)] },
+        Recipe { output: "minecraft:mossy_stone_brick_stairs", output_count: 1, ingredients: &[("minecraft:mossy_stone_bricks", 1)] },
+        Recipe { output: "minecraft:mossy_stone_brick_slab", output_count: 2, ingredients: &[("minecraft:mossy_stone_bricks", 1)] },
+        Recipe { output: "minecraft:mossy_stone_brick_wall", output_count: 1, ingredients: &[("minecraft:mossy_stone_bricks", 1)] },
+        Recipe { output: "minecraft:smooth_stone_slab", output_count: 2, ingredients: &[("minecraft:smooth_stone", 1)] },
+
+        // Granite
+        Recipe { output: "minecraft:granite_stairs", output_count: 1, ingredients: &[("minecraft:granite", 1)] },
+        Recipe { output: "minecraft:granite_slab", output_count: 2, ingredients: &[("minecraft:granite", 1)] },
+        Recipe { output: "minecraft:granite_wall", output_count: 1, ingredients: &[("minecraft:granite", 1)] },
+        Recipe { output: "minecraft:polished_granite_stairs", output_count: 1, ingredients: &[("minecraft:polished_granite", 1)] },
+        Recipe { output: "minecraft:polished_granite_slab", output_count: 2, ingredients: &[("minecraft:polished_granite", 1)] },
+
+        // Diorite
+        Recipe { output: "minecraft:diorite_stairs", output_count: 1, ingredients: &[("minecraft:diorite", 1)] },
+        Recipe { output: "minecraft:diorite_slab", output_count: 2, ingredients: &[("minecraft:diorite", 1)] },
+        Recipe { output: "minecraft:diorite_wall", output_count: 1, ingredients: &[("minecraft:diorite", 1)] },
+        Recipe { output: "minecraft:polished_diorite_stairs", output_count: 1, ingredients: &[("minecraft:polished_diorite", 1)] },
+        Recipe { output: "minecraft:polished_diorite_slab", output_count: 2, ingredients: &[("minecraft:polished_diorite", 1)] },
+
+        // Andesite
+        Recipe { output: "minecraft:andesite_stairs", output_count: 1, ingredients: &[("minecraft:andesite", 1)] },
+        Recipe { output: "minecraft:andesite_slab", output_count: 2, ingredients: &[("minecraft:andesite", 1)] },
+        Recipe { output: "minecraft:andesite_wall", output_count: 1, ingredients: &[("minecraft:andesite", 1)] },
+        Recipe { output: "minecraft:polished_andesite_stairs", output_count: 1, ingredients: &[("minecraft:polished_andesite", 1)] },
+        Recipe { output: "minecraft:polished_andesite_slab", output_count: 2, ingredients: &[("minecraft:polished_andesite", 1)] },
+
+        // Deepslate
+        Recipe { output: "minecraft:cobbled_deepslate_stairs", output_count: 1, ingredients: &[("minecraft:cobbled_deepslate", 1)] },
+        Recipe { output: "minecraft:cobbled_deepslate_slab", output_count: 2, ingredients: &[("minecraft:cobbled_deepslate", 1)] },
+        Recipe { output: "minecraft:cobbled_deepslate_wall", output_count: 1, ingredients: &[("minecraft:cobbled_deepslate", 1)] },
+        Recipe { output: "minecraft:polished_deepslate_stairs", output_count: 1, ingredients: &[("minecraft:polished_deepslate", 1)] },
+        Recipe { output: "minecraft:polished_deepslate_slab", output_count: 2, ingredients: &[("minecraft:polished_deepslate", 1)] },
+        Recipe { output: "minecraft:polished_deepslate_wall", output_count: 1, ingredients: &[("minecraft:polished_deepslate", 1)] },
+        Recipe { output: "minecraft:deepslate_brick_stairs", output_count: 1, ingredients: &[("minecraft:deepslate_bricks", 1)] },
+        Recipe { output: "minecraft:deepslate_brick_slab", output_count: 2, ingredients: &[("minecraft:deepslate_bricks", 1)] },
+        Recipe { output: "minecraft:deepslate_brick_wall", output_count: 1, ingredients: &[("minecraft:deepslate_bricks", 1)] },
+        Recipe { output: "minecraft:deepslate_tile_stairs", output_count: 1, ingredients: &[("minecraft:deepslate_tiles", 1)] },
+        Recipe { output: "minecraft:deepslate_tile_slab", output_count: 2, ingredients: &[("minecraft:deepslate_tiles", 1)] },
+        Recipe { output: "minecraft:deepslate_tile_wall", output_count: 1, ingredients: &[("minecraft:deepslate_tiles", 1)] },
+
+        // Blackstone
+        Recipe { output: "minecraft:blackstone_stairs", output_count: 1, ingredients: &[("minecraft:blackstone", 1)] },
+        Recipe { output: "minecraft:blackstone_slab", output_count: 2, ingredients: &[("minecraft:blackstone", 1)] },
+        Recipe { output: "minecraft:blackstone_wall", output_count: 1, ingredients: &[("minecraft:blackstone", 1)] },
+        Recipe { output: "minecraft:polished_blackstone_stairs", output_count: 1, ingredients: &[("minecraft:polished_blackstone", 1)] },
+        Recipe { output: "minecraft:polished_blackstone_slab", output_count: 2, ingredients: &[("minecraft:polished_blackstone", 1)] },
+        Recipe { output: "minecraft:polished_blackstone_wall", output_count: 1, ingredients: &[("minecraft:polished_blackstone", 1)] },
+        Recipe { output: "minecraft:polished_blackstone_brick_stairs", output_count: 1, ingredients: &[("minecraft:polished_blackstone_bricks", 1)] },
+        Recipe { output: "minecraft:polished_blackstone_brick_slab", output_count: 2, ingredients: &[("minecraft:polished_blackstone_bricks", 1)] },
+        Recipe { output: "minecraft:polished_blackstone_brick_wall", output_count: 1, ingredients: &[("minecraft:polished_blackstone_bricks", 1)] },
+
+        // Nether bricks
+        Recipe { output: "minecraft:nether_brick_stairs", output_count: 1, ingredients: &[("minecraft:nether_bricks", 1)] },
+        Recipe { output: "minecraft:nether_brick_slab", output_count: 2, ingredients: &[("minecraft:nether_bricks", 1)] },
+        Recipe { output: "minecraft:nether_brick_wall", output_count: 1, ingredients: &[("minecraft:nether_bricks", 1)] },
+        Recipe { output: "minecraft:red_nether_brick_stairs", output_count: 1, ingredients: &[("minecraft:red_nether_bricks", 1)] },
+        Recipe { output: "minecraft:red_nether_brick_slab", output_count: 2, ingredients: &[("minecraft:red_nether_bricks", 1)] },
+        Recipe { output: "minecraft:red_nether_brick_wall", output_count: 1, ingredients: &[("minecraft:red_nether_bricks", 1)] },
+
+        // Quartz
+        Recipe { output: "minecraft:quartz_stairs", output_count: 1, ingredients: &[("minecraft:quartz_block", 1)] },
+        Recipe { output: "minecraft:quartz_slab", output_count: 2, ingredients: &[("minecraft:quartz_block", 1)] },
+        Recipe { output: "minecraft:smooth_quartz_stairs", output_count: 1, ingredients: &[("minecraft:smooth_quartz", 1)] },
+        Recipe { output: "minecraft:smooth_quartz_slab", output_count: 2, ingredients: &[("minecraft:smooth_quartz", 1)] },
+
+        // Bricks
+        Recipe { output: "minecraft:brick_stairs", output_count: 1, ingredients: &[("minecraft:bricks", 1)] },
+        Recipe { output: "minecraft:brick_slab", output_count: 2, ingredients: &[("minecraft:bricks", 1)] },
+        Recipe { output: "minecraft:brick_wall", output_count: 1, ingredients: &[("minecraft:bricks", 1)] },
+        Recipe { output: "minecraft:mud_brick_stairs", output_count: 1, ingredients: &[("minecraft:mud_bricks", 1)] },
+        Recipe { output: "minecraft:mud_brick_slab", output_count: 2, ingredients: &[("minecraft:mud_bricks", 1)] },
+        Recipe { output: "minecraft:mud_brick_wall", output_count: 1, ingredients: &[("minecraft:mud_bricks", 1)] },
+
+        // Sandstone
+        Recipe { output: "minecraft:sandstone_stairs", output_count: 1, ingredients: &[("minecraft:sandstone", 1)] },
+        Recipe { output: "minecraft:sandstone_slab", output_count: 2, ingredients: &[("minecraft:sandstone", 1)] },
+        Recipe { output: "minecraft:sandstone_wall", output_count: 1, ingredients: &[("minecraft:sandstone", 1)] },
+        Recipe { output: "minecraft:smooth_sandstone_stairs", output_count: 1, ingredients: &[("minecraft:smooth_sandstone", 1)] },
+        Recipe { output: "minecraft:smooth_sandstone_slab", output_count: 2, ingredients: &[("minecraft:smooth_sandstone", 1)] },
+        Recipe { output: "minecraft:red_sandstone_stairs", output_count: 1, ingredients: &[("minecraft:red_sandstone", 1)] },
+        Recipe { output: "minecraft:red_sandstone_slab", output_count: 2, ingredients: &[("minecraft:red_sandstone", 1)] },
+        Recipe { output: "minecraft:red_sandstone_wall", output_count: 1, ingredients: &[("minecraft:red_sandstone", 1)] },
+        Recipe { output: "minecraft:smooth_red_sandstone_stairs", output_count: 1, ingredients: &[("minecraft:smooth_red_sandstone", 1)] },
+        Recipe { output: "minecraft:smooth_red_sandstone_slab", output_count: 2, ingredients: &[("minecraft:smooth_red_sandstone", 1)] },
+
+        // Prismarine
+        Recipe { output: "minecraft:prismarine_stairs", output_count: 1, ingredients: &[("minecraft:prismarine", 1)] },
+        Recipe { output: "minecraft:prismarine_slab", output_count: 2, ingredients: &[("minecraft:prismarine", 1)] },
+        Recipe { output: "minecraft:prismarine_wall", output_count: 1, ingredients: &[("minecraft:prismarine", 1)] },
+        Recipe { output: "minecraft:prismarine_brick_stairs", output_count: 1, ingredients: &[("minecraft:prismarine_bricks", 1)] },
+        Recipe { output: "minecraft:prismarine_brick_slab", output_count: 2, ingredients: &[("minecraft:prismarine_bricks", 1)] },
+        Recipe { output: "minecraft:dark_prismarine_stairs", output_count: 1, ingredients: &[("minecraft:dark_prismarine", 1)] },
+        Recipe { output: "minecraft:dark_prismarine_slab", output_count: 2, ingredients: &[("minecraft:dark_prismarine", 1)] },
+
+        // End stone
+        Recipe { output: "minecraft:end_stone_brick_stairs", output_count: 1, ingredients: &[("minecraft:end_stone_bricks", 1)] },
+        Recipe { output: "minecraft:end_stone_brick_slab", output_count: 2, ingredients: &[("minecraft:end_stone_bricks", 1)] },
+        Recipe { output: "minecraft:end_stone_brick_wall", output_count: 1, ingredients: &[("minecraft:end_stone_bricks", 1)] },
+
+        // Purpur
+        Recipe { output: "minecraft:purpur_stairs", output_count: 1, ingredients: &[("minecraft:purpur_block", 1)] },
+        Recipe { output: "minecraft:purpur_slab", output_count: 2, ingredients: &[("minecraft:purpur_block", 1)] },
+
+        // Copper (cut copper)
+        Recipe { output: "minecraft:cut_copper_stairs", output_count: 1, ingredients: &[("minecraft:cut_copper", 1)] },
+        Recipe { output: "minecraft:cut_copper_slab", output_count: 2, ingredients: &[("minecraft:cut_copper", 1)] },
+        Recipe { output: "minecraft:exposed_cut_copper_stairs", output_count: 1, ingredients: &[("minecraft:exposed_cut_copper", 1)] },
+        Recipe { output: "minecraft:exposed_cut_copper_slab", output_count: 2, ingredients: &[("minecraft:exposed_cut_copper", 1)] },
+        Recipe { output: "minecraft:weathered_cut_copper_stairs", output_count: 1, ingredients: &[("minecraft:weathered_cut_copper", 1)] },
+        Recipe { output: "minecraft:weathered_cut_copper_slab", output_count: 2, ingredients: &[("minecraft:weathered_cut_copper", 1)] },
+        Recipe { output: "minecraft:oxidized_cut_copper_stairs", output_count: 1, ingredients: &[("minecraft:oxidized_cut_copper", 1)] },
+        Recipe { output: "minecraft:oxidized_cut_copper_slab", output_count: 2, ingredients: &[("minecraft:oxidized_cut_copper", 1)] },
+        Recipe { output: "minecraft:waxed_cut_copper_stairs", output_count: 1, ingredients: &[("minecraft:waxed_cut_copper", 1)] },
+        Recipe { output: "minecraft:waxed_cut_copper_slab", output_count: 2, ingredients: &[("minecraft:waxed_cut_copper", 1)] },
+        Recipe { output: "minecraft:waxed_exposed_cut_copper_stairs", output_count: 1, ingredients: &[("minecraft:waxed_exposed_cut_copper", 1)] },
+        Recipe { output: "minecraft:waxed_exposed_cut_copper_slab", output_count: 2, ingredients: &[("minecraft:waxed_exposed_cut_copper", 1)] },
+        Recipe { output: "minecraft:waxed_weathered_cut_copper_stairs", output_count: 1, ingredients: &[("minecraft:waxed_weathered_cut_copper", 1)] },
+        Recipe { output: "minecraft:waxed_weathered_cut_copper_slab", output_count: 2, ingredients: &[("minecraft:waxed_weathered_cut_copper", 1)] },
+        Recipe { output: "minecraft:waxed_oxidized_cut_copper_stairs", output_count: 1, ingredients: &[("minecraft:waxed_oxidized_cut_copper", 1)] },
+        Recipe { output: "minecraft:waxed_oxidized_cut_copper_slab", output_count: 2, ingredients: &[("minecraft:waxed_oxidized_cut_copper", 1)] },
+
+        // Tuff
+        Recipe { output: "minecraft:tuff_stairs", output_count: 1, ingredients: &[("minecraft:tuff", 1)] },
+        Recipe { output: "minecraft:tuff_slab", output_count: 2, ingredients: &[("minecraft:tuff", 1)] },
+        Recipe { output: "minecraft:tuff_wall", output_count: 1, ingredients: &[("minecraft:tuff", 1)] },
+        Recipe { output: "minecraft:polished_tuff_stairs", output_count: 1, ingredients: &[("minecraft:polished_tuff", 1)] },
+        Recipe { output: "minecraft:polished_tuff_slab", output_count: 2, ingredients: &[("minecraft:polished_tuff", 1)] },
+        Recipe { output: "minecraft:polished_tuff_wall", output_count: 1, ingredients: &[("minecraft:polished_tuff", 1)] },
+        Recipe { output: "minecraft:tuff_brick_stairs", output_count: 1, ingredients: &[("minecraft:tuff_bricks", 1)] },
+        Recipe { output: "minecraft:tuff_brick_slab", output_count: 2, ingredients: &[("minecraft:tuff_bricks", 1)] },
+        Recipe { output: "minecraft:tuff_brick_wall", output_count: 1, ingredients: &[("minecraft:tuff_bricks", 1)] },
+    ];
+
+    recipes.into_iter().map(|r| (r.output, r)).collect()
 }
 
 /// Calculate raw materials needed for a block count
 pub fn calculate_materials(blocks: &HashMap<String, usize>) -> HashMap<String, f64> {
-    let recipes = get_recipes();
+    calculate_materials_with_options(blocks, false)
+}
+
+/// Calculate raw materials with options
+/// - `use_stonecutter`: If true, uses stonecutter recipes (1:1 ratios) for stairs/slabs/walls
+pub fn calculate_materials_with_options(blocks: &HashMap<String, usize>, use_stonecutter: bool) -> HashMap<String, f64> {
+    let mut recipes = get_recipes();
+
+    // Override with stonecutter recipes if enabled
+    if use_stonecutter {
+        for (name, recipe) in get_stonecutter_recipes() {
+            recipes.insert(name, recipe);
+        }
+    }
+
     let mut materials: HashMap<String, f64> = HashMap::new();
     let mut to_process: Vec<(String, f64)> = blocks.iter()
         .filter(|(name, _)| !name.contains("air"))

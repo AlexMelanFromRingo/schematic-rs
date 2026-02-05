@@ -151,6 +151,10 @@ enum Commands {
         /// Limit number of results
         #[arg(short, long)]
         limit: Option<usize>,
+
+        /// Use stonecutter recipes (more efficient 1:1 ratios for stairs/slabs)
+        #[arg(long)]
+        stonecutter: bool,
     },
 
     /// Show layer-by-layer view (2D slice)
@@ -256,7 +260,7 @@ fn main() -> Result<()> {
         Commands::GetBlock { file, x, y, z } => cmd_get_block(&file, x, y, z)?,
         Commands::Search { file, pattern, positions, limit } => cmd_search(&file, &pattern, positions, limit)?,
         Commands::Export { file, output } => cmd_export(&file, &output)?,
-        Commands::Materials { file, sort, verbose, limit } => cmd_materials(&file, sort, verbose, limit)?,
+        Commands::Materials { file, sort, verbose, limit, stonecutter } => cmd_materials(&file, sort, verbose, limit, stonecutter)?,
         Commands::Layer { file, y, ascii } => cmd_layer(&file, y, ascii)?,
         Commands::RenderObj { file, output, hollow, greedy, models, textures, minecraft, resource_pack } => cmd_render_obj(&file, &output, hollow, greedy, models, textures, minecraft.as_deref(), resource_pack.as_deref())?,
         Commands::RenderHtml { file, output, max_blocks } => cmd_render_html(&file, &output, max_blocks)?,
@@ -631,7 +635,7 @@ fn cmd_export(file: &PathBuf, output: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn cmd_materials(file: &PathBuf, sort: bool, verbose: bool, limit: Option<usize>) -> Result<()> {
+fn cmd_materials(file: &PathBuf, sort: bool, verbose: bool, limit: Option<usize>, stonecutter: bool) -> Result<()> {
     let schem = UnifiedSchematic::load(file)?;
     let block_counts = schem.block_counts();
 
@@ -651,10 +655,14 @@ fn cmd_materials(file: &PathBuf, sort: bool, verbose: bool, limit: Option<usize>
         println!();
     }
 
-    println!("{}", "=== Raw Materials Needed ===".bold().cyan());
+    if stonecutter {
+        println!("{}", "=== Raw Materials Needed (Stonecutter Mode) ===".bold().cyan());
+    } else {
+        println!("{}", "=== Raw Materials Needed ===".bold().cyan());
+    }
     println!();
 
-    let materials = schem_tool::recipes::calculate_materials(&block_counts);
+    let materials = schem_tool::recipes::calculate_materials_with_options(&block_counts, stonecutter);
 
     let mut sorted: Vec<_> = materials.into_iter().collect();
     if sort {
