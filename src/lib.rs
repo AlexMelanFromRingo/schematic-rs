@@ -7,6 +7,7 @@ pub mod mc_models;
 pub mod error;
 pub mod recipes;
 pub mod export3d;
+pub mod export_gltf;
 pub mod textures;
 
 pub use schematic::Schematic;

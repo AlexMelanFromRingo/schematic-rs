@@ -23,6 +23,7 @@ Supports multiple formats:
 - **Water rendering** — waterlogged blocks, water/lava, cauldron liquids
 - **Texture extraction** from Minecraft installation with proper tiling
 - **Memory optimized** — streaming export for massive schematics (33M+ blocks)
+- **GLB export** with GPU instancing (30GB → 1GB for identical blocks)
 - **Interactive HTML viewer** using Three.js
 - **Debug** raw NBT structure
 
@@ -145,6 +146,13 @@ schem-tool render-obj my_build.schem -o model.obj --textures -m /path/to/client.
 
 # Export to interactive HTML viewer
 schem-tool render-html my_build.schem -o view.html -m 100000
+
+# Export to GLB with GPU instancing (much smaller files for large schematics)
+schem-tool render-gltf my_build.schem -o model.glb
+
+# GLB with JSON models
+schem-tool render-gltf my_build.schem -o model.glb --models \
+    --minecraft /path/to/client.jar
 ```
 
 #### Greedy Meshing
@@ -192,6 +200,22 @@ The `--resource-pack` flag loads custom textures and models from a resource pack
 - Overrides vanilla textures with pack textures
 - Loads custom blockstates and models
 - Supports standard Minecraft resource pack format
+
+#### GLB with GPU Instancing
+
+The `render-gltf` command exports to GLB (binary glTF) format with GPU instancing:
+- Each unique block type is stored **once** as geometry
+- Identical blocks share the same mesh via `EXT_mesh_gpu_instancing` extension
+- Dramatically smaller files for large schematics (30GB OBJ → ~1GB GLB)
+- Supported by Blender 3.0+, Windows 3D Viewer, and most modern 3D software
+
+```bash
+# Simple cubes (fastest)
+schem-tool render-gltf my_build.schem -o model.glb
+
+# With Minecraft JSON models
+schem-tool render-gltf my_build.schem -o model.glb --models -m /path/to/client.jar
+```
 
 #### Water and Liquids
 

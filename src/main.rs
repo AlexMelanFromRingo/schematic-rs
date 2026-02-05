@@ -219,6 +219,24 @@ enum Commands {
         max_blocks: usize,
     },
 
+    /// Export to GLB (binary glTF) with GPU instancing (much smaller files for large schematics)
+    RenderGltf {
+        /// Path to the schematic file
+        file: PathBuf,
+
+        /// Output GLB file path
+        #[arg(short, long)]
+        output: PathBuf,
+
+        /// Use Minecraft JSON models for accurate block geometry
+        #[arg(long)]
+        models: bool,
+
+        /// Path to Minecraft directory or client.jar for JSON models
+        #[arg(short, long)]
+        minecraft: Option<PathBuf>,
+    },
+
     /// Dump raw NBT structure for debugging
     Debug {
         /// Path to the schematic file
@@ -264,6 +282,7 @@ fn main() -> Result<()> {
         Commands::Layer { file, y, ascii } => cmd_layer(&file, y, ascii)?,
         Commands::RenderObj { file, output, hollow, greedy, models, textures, minecraft, resource_pack } => cmd_render_obj(&file, &output, hollow, greedy, models, textures, minecraft.as_deref(), resource_pack.as_deref())?,
         Commands::RenderHtml { file, output, max_blocks } => cmd_render_html(&file, &output, max_blocks)?,
+        Commands::RenderGltf { file, output, models, minecraft } => cmd_render_gltf(&file, &output, models, minecraft.as_deref())?,
         Commands::Debug { file } => cmd_debug(&file)?,
     }
 
@@ -913,6 +932,53 @@ fn cmd_render_html(file: &PathBuf, output: &PathBuf, max_blocks: usize) -> Resul
     println!();
     println!("Open in any web browser for interactive 3D view.");
     println!("Controls: drag to rotate, scroll to zoom.");
+
+    Ok(())
+}
+
+fn cmd_render_gltf(file: &PathBuf, output: &PathBuf, models: bool, minecraft: Option<&std::path::Path>) -> Result<()> {
+    let schem = UnifiedSchematic::load(file)?;
+
+    println!("{}", "=== Exporting to GLB (with GPU instancing) ===".bold().cyan());
+    println!();
+    println!("  Schematic: {}x{}x{}", schem.width, schem.height, schem.length);
+    println!("  Solid blocks: {}", schem.solid_blocks());
+    println!("  Mode: {} (identical blocks share geometry)", if models { "JSON models" } else { "cubes" });
+    println!();
+
+    // Find jar path for models
+    let jar_path = if models {
+        if let Some(mc_path) = minecraft {
+            if mc_path.extension().map(|e| e == "jar").unwrap_or(false) {
+                Some(mc_path.to_path_buf())
+            } else {
+                schem_tool::textures::find_client_jar(mc_path)
+            }
+        } else {
+            // Try auto-detect
+            schem_tool::textures::get_minecraft_dir()
+                .and_then(|mc_dir| schem_tool::textures::find_client_jar(&mc_dir))
+        }
+    } else {
+        None
+    };
+
+    if models && jar_path.is_none() {
+        println!("  {}: Could not find Minecraft client.jar. Use --minecraft to specify path.", "Warning".yellow());
+        println!("  Falling back to simple cube geometry.");
+        println!();
+    } else if let Some(ref p) = jar_path {
+        println!("  Using models from: {}", p.display());
+    }
+
+    schem_tool::export_gltf::export_glb(&schem, output, jar_path.as_deref(), None)?;
+
+    println!();
+    println!("{}:", "Exported".green());
+    println!("  GLB: {}", output.display());
+    println!();
+    println!("Open in: Blender, Windows 3D Viewer, online viewers, etc.");
+    println!("Note: Requires EXT_mesh_gpu_instancing support for full rendering.");
 
     Ok(())
 }
