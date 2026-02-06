@@ -228,13 +228,25 @@ enum Commands {
         #[arg(short, long)]
         output: PathBuf,
 
+        /// Only export visible (exposed) blocks
+        #[arg(long)]
+        hollow: bool,
+
         /// Use Minecraft JSON models for accurate block geometry
         #[arg(long)]
         models: bool,
 
-        /// Path to Minecraft directory or client.jar for JSON models
+        /// Extract and apply textures from Minecraft installation
+        #[arg(short, long)]
+        textures: bool,
+
+        /// Path to Minecraft directory or client.jar
         #[arg(short, long)]
         minecraft: Option<PathBuf>,
+
+        /// Path to resource pack (ZIP file) for custom textures and models
+        #[arg(short, long)]
+        resource_pack: Option<PathBuf>,
     },
 
     /// Dump raw NBT structure for debugging
@@ -282,7 +294,7 @@ fn main() -> Result<()> {
         Commands::Layer { file, y, ascii } => cmd_layer(&file, y, ascii)?,
         Commands::RenderObj { file, output, hollow, greedy, models, textures, minecraft, resource_pack } => cmd_render_obj(&file, &output, hollow, greedy, models, textures, minecraft.as_deref(), resource_pack.as_deref())?,
         Commands::RenderHtml { file, output, max_blocks } => cmd_render_html(&file, &output, max_blocks)?,
-        Commands::RenderGltf { file, output, models, minecraft } => cmd_render_gltf(&file, &output, models, minecraft.as_deref())?,
+        Commands::RenderGltf { file, output, hollow, models, textures, minecraft, resource_pack } => cmd_render_gltf(&file, &output, hollow, models, textures, minecraft.as_deref(), resource_pack.as_deref())?,
         Commands::Debug { file } => cmd_debug(&file)?,
     }
 
@@ -936,7 +948,15 @@ fn cmd_render_html(file: &PathBuf, output: &PathBuf, max_blocks: usize) -> Resul
     Ok(())
 }
 
-fn cmd_render_gltf(file: &PathBuf, output: &PathBuf, models: bool, minecraft: Option<&std::path::Path>) -> Result<()> {
+fn cmd_render_gltf(
+    file: &PathBuf,
+    output: &PathBuf,
+    hollow: bool,
+    models: bool,
+    use_textures: bool,
+    minecraft: Option<&std::path::Path>,
+    resource_pack: Option<&std::path::Path>,
+) -> Result<()> {
     let schem = UnifiedSchematic::load(file)?;
 
     println!("{}", "=== Exporting to GLB (with GPU instancing) ===".bold().cyan());
@@ -944,10 +964,10 @@ fn cmd_render_gltf(file: &PathBuf, output: &PathBuf, models: bool, minecraft: Op
     println!("  Schematic: {}x{}x{}", schem.width, schem.height, schem.length);
     println!("  Solid blocks: {}", schem.solid_blocks());
     println!("  Mode: {} (identical blocks share geometry)", if models { "JSON models" } else { "cubes" });
+    if hollow { println!("  Hollow: only visible blocks"); }
     println!();
 
-    // Find jar path for models
-    let jar_path = if models {
+    let jar_path = if models || use_textures {
         if let Some(mc_path) = minecraft {
             if mc_path.extension().map(|e| e == "jar").unwrap_or(false) {
                 Some(mc_path.to_path_buf())
@@ -955,9 +975,27 @@ fn cmd_render_gltf(file: &PathBuf, output: &PathBuf, models: bool, minecraft: Op
                 schem_tool::textures::find_client_jar(mc_path)
             }
         } else {
-            // Try auto-detect
             schem_tool::textures::get_minecraft_dir()
                 .and_then(|mc_dir| schem_tool::textures::find_client_jar(&mc_dir))
+        }
+    } else {
+        None
+    };
+
+    // Load textures if requested
+    let textures = if use_textures {
+        let tm = schem_tool::textures::TextureManager::from_minecraft_with_path(
+            minecraft, resource_pack,
+        );
+        match tm {
+            Some(tm) => {
+                println!("  Textures: {} loaded", tm.texture_count().to_string().green());
+                Some(tm)
+            }
+            None => {
+                println!("  Textures: {} (Minecraft not found)", "unavailable".red());
+                None
+            }
         }
     } else {
         None
@@ -971,14 +1009,20 @@ fn cmd_render_gltf(file: &PathBuf, output: &PathBuf, models: bool, minecraft: Op
         println!("  Using models from: {}", p.display());
     }
 
-    schem_tool::export_gltf::export_glb(&schem, output, jar_path.as_deref(), None)?;
+    schem_tool::export_gltf::export_glb(
+        &schem,
+        output,
+        jar_path.as_deref(),
+        textures.as_ref(),
+        hollow,
+        resource_pack,
+    )?;
 
     println!();
     println!("{}:", "Exported".green());
     println!("  GLB: {}", output.display());
     println!();
     println!("Open in: Blender, Windows 3D Viewer, online viewers, etc.");
-    println!("Note: Requires EXT_mesh_gpu_instancing support for full rendering.");
 
     Ok(())
 }

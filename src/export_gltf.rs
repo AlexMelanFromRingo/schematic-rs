@@ -168,6 +168,7 @@ struct GltfPbr {
 // ============ Constants ============
 
 const GLTF_FLOAT: u32 = 5126;
+#[allow(dead_code)]
 const GLTF_UNSIGNED_SHORT: u32 = 5123;
 const GLTF_UNSIGNED_INT: u32 = 5125;
 const GLTF_ARRAY_BUFFER: u32 = 34962;
@@ -187,6 +188,36 @@ struct BlockMesh {
     indices: Vec<u32>,
     /// Material name
     material: String,
+}
+
+/// Check if block at (x, y, z) has any neighbor that is air or transparent
+fn is_exposed(schematic: &UnifiedSchematic, x: usize, y: usize, z: usize, w: usize, h: usize, l: usize) -> bool {
+    // Edge blocks are always exposed
+    if x == 0 || x == w - 1 || y == 0 || y == h - 1 || z == 0 || z == l - 1 {
+        return true;
+    }
+    let neighbors = [
+        schematic.get_block((x - 1) as u16, y as u16, z as u16),
+        schematic.get_block((x + 1) as u16, y as u16, z as u16),
+        schematic.get_block(x as u16, (y - 1) as u16, z as u16),
+        schematic.get_block(x as u16, (y + 1) as u16, z as u16),
+        schematic.get_block(x as u16, y as u16, (z - 1) as u16),
+        schematic.get_block(x as u16, y as u16, (z + 1) as u16),
+    ];
+    for n in &neighbors {
+        match n {
+            None => return true,
+            Some(b) if b.is_air() => return true,
+            Some(b) => {
+                let name = b.name.strip_prefix("minecraft:").unwrap_or(&b.name);
+                if name.contains("glass") || name.contains("leaves") || name.contains("water")
+                    || name.contains("lava") || name.contains("ice") {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 /// Generate a simple cube mesh (1x1x1 at origin)
@@ -383,6 +414,8 @@ pub fn export_glb<P: AsRef<Path>>(
     output_path: P,
     jar_path: Option<&Path>,
     _textures: Option<&TextureManager>,
+    hollow: bool,
+    resource_pack: Option<&Path>,
 ) -> std::io::Result<()> {
     let output_path = output_path.as_ref();
 
@@ -397,7 +430,7 @@ pub fn export_glb<P: AsRef<Path>>(
 
     // Load model manager if jar provided
     let mut model_manager = jar_path.and_then(|p| {
-        ModelManager::from_jar(p).ok()
+        ModelManager::from_jar_with_resource_pack(p, resource_pack).ok()
     });
 
     let mut processed = 0u64;
@@ -411,6 +444,11 @@ pub fn export_glb<P: AsRef<Path>>(
 
                 let Some(block) = schematic.get_block(x as u16, y as u16, z as u16) else { continue };
                 if block.is_air() { continue; }
+
+                // Skip unexposed blocks if hollow mode
+                if hollow && !is_exposed(schematic, x, y, z, w, h, l) {
+                    continue;
+                }
 
                 // Create key from block name + relevant properties
                 let key = block.display_name();
