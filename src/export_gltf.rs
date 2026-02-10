@@ -236,10 +236,19 @@ impl MaterialGeometry {
             (0.0, 1.0, 0.0)
         };
 
+        // Local V-flip within quad's UV rectangle for glTF convention.
+        // Minecraft model UVs map bottom-of-face to v_min (top of texture).
+        // In glTF (v=0 at top), this makes textures appear upside down.
+        // Flipping V within the quad's own UV range fixes orientation
+        // while preserving the correct texture region for partial UVs.
+        let v_min = quad.uv_coords.iter().map(|uv| uv.1).fold(f32::INFINITY, f32::min);
+        let v_max = quad.uv_coords.iter().map(|uv| uv.1).fold(f32::NEG_INFINITY, f32::max);
+
         for (i, v) in quad.vertices.iter().enumerate() {
             self.positions.extend_from_slice(&[v.0, v.1, v.2]);
             self.normals.extend_from_slice(&[normal.0, normal.1, normal.2]);
-            self.uvs.extend_from_slice(&[quad.uv_coords[i].0, quad.uv_coords[i].1]);
+            let flipped_v = v_min + v_max - quad.uv_coords[i].1;
+            self.uvs.extend_from_slice(&[quad.uv_coords[i].0, flipped_v]);
         }
 
         self.indices.extend_from_slice(&[

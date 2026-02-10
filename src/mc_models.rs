@@ -930,12 +930,19 @@ pub fn generate_model_quads(
             let rotated_face_dir = face_dir.rotate_x(x_rot).rotate_y(y_rot);
 
             // UV coordinates (normalized to 0-1 range from 0-16)
-            let uv_coords = [
-                (uv[0] / 16.0, uv[1] / 16.0),
-                (uv[2] / 16.0, uv[1] / 16.0),
-                (uv[2] / 16.0, uv[3] / 16.0),
-                (uv[0] / 16.0, uv[3] / 16.0),
-            ];
+            // Base UV corners: p0=top-left, p1=top-right, p2=bottom-right, p3=bottom-left
+            let p0 = (uv[0] / 16.0, uv[1] / 16.0);
+            let p1 = (uv[2] / 16.0, uv[1] / 16.0);
+            let p2 = (uv[2] / 16.0, uv[3] / 16.0);
+            let p3 = (uv[0] / 16.0, uv[3] / 16.0);
+
+            // Apply face UV rotation (rotates texture on the face)
+            let uv_coords = match face.rotation.map(|r| r.0).unwrap_or(0) {
+                90  => [p3, p0, p1, p2],
+                180 => [p2, p3, p0, p1],
+                270 => [p1, p2, p3, p0],
+                _   => [p0, p1, p2, p3],
+            };
 
             quads.push(GeneratedQuad {
                 vertices: world_verts,
