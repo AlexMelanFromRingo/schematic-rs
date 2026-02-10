@@ -232,6 +232,10 @@ enum Commands {
         #[arg(long)]
         hollow: bool,
 
+        /// Accepted for CLI compatibility (GLB uses instancing instead of greedy meshing)
+        #[arg(short, long)]
+        greedy: bool,
+
         /// Use Minecraft JSON models for accurate block geometry
         #[arg(long)]
         models: bool,
@@ -294,7 +298,7 @@ fn main() -> Result<()> {
         Commands::Layer { file, y, ascii } => cmd_layer(&file, y, ascii)?,
         Commands::RenderObj { file, output, hollow, greedy, models, textures, minecraft, resource_pack } => cmd_render_obj(&file, &output, hollow, greedy, models, textures, minecraft.as_deref(), resource_pack.as_deref())?,
         Commands::RenderHtml { file, output, max_blocks } => cmd_render_html(&file, &output, max_blocks)?,
-        Commands::RenderGltf { file, output, hollow, models, textures, minecraft, resource_pack } => cmd_render_gltf(&file, &output, hollow, models, textures, minecraft.as_deref(), resource_pack.as_deref())?,
+        Commands::RenderGltf { file, output, hollow, greedy: _, models, textures, minecraft, resource_pack } => cmd_render_gltf(&file, &output, hollow, models, textures, minecraft.as_deref(), resource_pack.as_deref())?,
         Commands::Debug { file } => cmd_debug(&file)?,
     }
 
@@ -959,12 +963,41 @@ fn cmd_render_gltf(
 ) -> Result<()> {
     let schem = UnifiedSchematic::load(file)?;
 
-    println!("{}", "=== Exporting to GLB (with GPU instancing) ===".bold().cyan());
+    println!("{}", "=== Exporting to GLB ===".bold().cyan());
     println!();
     println!("  Schematic: {}x{}x{}", schem.width, schem.height, schem.length);
     println!("  Solid blocks: {}", schem.solid_blocks());
-    println!("  Mode: {} (identical blocks share geometry)", if models { "JSON models" } else { "cubes" });
+    println!("  Mode: {}", if models { "JSON models (accurate geometry)".green() } else { "cubes".green() });
     if hollow { println!("  Hollow: only visible blocks"); }
+
+    // Load textures if requested
+    let textures = if use_textures {
+        println!("  Textures: {}", "loading...".yellow());
+        let tm = schem_tool::textures::TextureManager::from_minecraft_with_path(minecraft, resource_pack);
+        match tm {
+            Some(tm) => {
+                let rp_count = tm.resource_pack_texture_count();
+                if rp_count > 0 {
+                    println!("  Textures: {} vanilla + {} from resource pack",
+                        tm.texture_count().to_string().green(),
+                        rp_count.to_string().green());
+                } else {
+                    println!("  Textures: {} textures loaded", tm.texture_count().to_string().green());
+                }
+                Some(tm)
+            }
+            None => {
+                println!("  Textures: {} (Minecraft not found, using colors)", "unavailable".red());
+                if minecraft.is_none() {
+                    println!("  {}: Use --minecraft <path> to specify Minecraft directory or client.jar", "Hint".yellow());
+                }
+                None
+            }
+        }
+    } else {
+        println!("  Textures: disabled (use --textures to enable)");
+        None
+    };
     println!();
 
     let jar_path = if models || use_textures {
@@ -977,25 +1010,6 @@ fn cmd_render_gltf(
         } else {
             schem_tool::textures::get_minecraft_dir()
                 .and_then(|mc_dir| schem_tool::textures::find_client_jar(&mc_dir))
-        }
-    } else {
-        None
-    };
-
-    // Load textures if requested
-    let textures = if use_textures {
-        let tm = schem_tool::textures::TextureManager::from_minecraft_with_path(
-            minecraft, resource_pack,
-        );
-        match tm {
-            Some(tm) => {
-                println!("  Textures: {} loaded", tm.texture_count().to_string().green());
-                Some(tm)
-            }
-            None => {
-                println!("  Textures: {} (Minecraft not found)", "unavailable".red());
-                None
-            }
         }
     } else {
         None

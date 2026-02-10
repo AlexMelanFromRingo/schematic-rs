@@ -1,7 +1,7 @@
-//! glTF/GLB export with GPU instancing support
+//! glTF/GLB export with explicit geometry (same approach as OBJ export)
 //!
-//! Uses EXT_mesh_gpu_instancing extension to efficiently render
-//! millions of identical blocks without duplicating geometry.
+//! Generates all block geometry at actual world positions, grouped by material.
+//! Supports Minecraft JSON models and embedded textures.
 
 use std::collections::HashMap;
 use std::io::{BufWriter, Write};
@@ -41,8 +41,12 @@ struct GltfRoot {
     buffer_views: Vec<GltfBufferView>,
     buffers: Vec<GltfBuffer>,
     materials: Vec<GltfMaterial>,
-    #[serde(rename = "extensionsUsed")]
-    extensions_used: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    images: Vec<GltfImage>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    samplers: Vec<GltfSampler>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    textures: Vec<GltfTexture>,
 }
 
 #[derive(Serialize)]
@@ -60,26 +64,7 @@ struct GltfScene {
 struct GltfNode {
     mesh: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    extensions: Option<GltfNodeExtensions>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
-}
-
-#[derive(Serialize)]
-struct GltfNodeExtensions {
-    #[serde(rename = "EXT_mesh_gpu_instancing")]
-    instancing: GltfInstancing,
-}
-
-#[derive(Serialize)]
-struct GltfInstancing {
-    attributes: GltfInstancingAttributes,
-}
-
-#[derive(Serialize)]
-struct GltfInstancingAttributes {
-    #[serde(rename = "TRANSLATION")]
-    translation: usize, // accessor index
 }
 
 #[derive(Serialize)]
@@ -151,6 +136,8 @@ struct GltfMaterial {
     pbr: GltfPbr,
     #[serde(rename = "alphaMode", skip_serializing_if = "Option::is_none")]
     alpha_mode: Option<String>,
+    #[serde(rename = "alphaCutoff", skip_serializing_if = "Option::is_none")]
+    alpha_cutoff: Option<f32>,
     #[serde(rename = "doubleSided")]
     double_sided: bool,
 }
@@ -163,36 +150,164 @@ struct GltfPbr {
     metallic_factor: f32,
     #[serde(rename = "roughnessFactor")]
     roughness_factor: f32,
+    #[serde(rename = "baseColorTexture", skip_serializing_if = "Option::is_none")]
+    base_color_texture: Option<GltfTextureInfo>,
+}
+
+#[derive(Serialize)]
+struct GltfImage {
+    #[serde(rename = "bufferView")]
+    buffer_view: usize,
+    #[serde(rename = "mimeType")]
+    mime_type: String,
+}
+
+#[derive(Serialize)]
+struct GltfSampler {
+    #[serde(rename = "magFilter")]
+    mag_filter: u32,
+    #[serde(rename = "minFilter")]
+    min_filter: u32,
+    #[serde(rename = "wrapS")]
+    wrap_s: u32,
+    #[serde(rename = "wrapT")]
+    wrap_t: u32,
+}
+
+#[derive(Serialize)]
+struct GltfTexture {
+    source: usize,
+    sampler: usize,
+}
+
+#[derive(Serialize)]
+struct GltfTextureInfo {
+    index: usize,
 }
 
 // ============ Constants ============
 
 const GLTF_FLOAT: u32 = 5126;
-#[allow(dead_code)]
-const GLTF_UNSIGNED_SHORT: u32 = 5123;
 const GLTF_UNSIGNED_INT: u32 = 5125;
 const GLTF_ARRAY_BUFFER: u32 = 34962;
 const GLTF_ELEMENT_ARRAY_BUFFER: u32 = 34963;
+const GLTF_NEAREST: u32 = 9728;
+const GLTF_REPEAT: u32 = 10497;
 
-// ============ Block mesh data ============
+// ============ Per-material geometry accumulator ============
 
-/// Mesh data for a unique block type
-struct BlockMesh {
-    /// Vertex positions (x, y, z) relative to block origin
+/// Accumulated geometry for one material
+struct MaterialGeometry {
     positions: Vec<f32>,
-    /// Vertex normals
     normals: Vec<f32>,
-    /// UV coordinates
     uvs: Vec<f32>,
-    /// Triangle indices
     indices: Vec<u32>,
-    /// Material name
-    material: String,
+}
+
+impl MaterialGeometry {
+    fn new() -> Self {
+        Self {
+            positions: Vec::new(),
+            normals: Vec::new(),
+            uvs: Vec::new(),
+            indices: Vec::new(),
+        }
+    }
+
+    /// Append a quad (4 vertices, 2 triangles) to this geometry
+    fn append_quad(&mut self, quad: &GeneratedQuad) {
+        let base_idx = (self.positions.len() / 3) as u32;
+
+        // Compute normal from first 3 vertices
+        let v0 = quad.vertices[0];
+        let v1 = quad.vertices[1];
+        let v2 = quad.vertices[2];
+        let e1 = (v1.0 - v0.0, v1.1 - v0.1, v1.2 - v0.2);
+        let e2 = (v2.0 - v0.0, v2.1 - v0.1, v2.2 - v0.2);
+        let n = (
+            e1.1 * e2.2 - e1.2 * e2.1,
+            e1.2 * e2.0 - e1.0 * e2.2,
+            e1.0 * e2.1 - e1.1 * e2.0,
+        );
+        let len = (n.0 * n.0 + n.1 * n.1 + n.2 * n.2).sqrt();
+        let normal = if len > 0.0 {
+            (n.0 / len, n.1 / len, n.2 / len)
+        } else {
+            (0.0, 1.0, 0.0)
+        };
+
+        for (i, v) in quad.vertices.iter().enumerate() {
+            self.positions.extend_from_slice(&[v.0, v.1, v.2]);
+            self.normals.extend_from_slice(&[normal.0, normal.1, normal.2]);
+            self.uvs.extend_from_slice(&[quad.uv_coords[i].0, quad.uv_coords[i].1]);
+        }
+
+        self.indices.extend_from_slice(&[
+            base_idx, base_idx + 1, base_idx + 2,
+            base_idx, base_idx + 2, base_idx + 3,
+        ]);
+    }
+}
+
+// ============ Helpers ============
+
+/// Generate 6 face quads for a unit cube at world position (x, y, z)
+fn generate_cube_quads(x: f32, y: f32, z: f32, texture: &str) -> Vec<GeneratedQuad> {
+    let uv = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
+    vec![
+        // Front (z+)
+        GeneratedQuad {
+            vertices: [(x, y, z+1.0), (x+1.0, y, z+1.0), (x+1.0, y+1.0, z+1.0), (x, y+1.0, z+1.0)],
+            uv_coords: uv,
+            texture: texture.to_string(),
+            face_dir: crate::mc_models::FaceDirection::South,
+            tint_index: -1,
+        },
+        // Back (z-)
+        GeneratedQuad {
+            vertices: [(x+1.0, y, z), (x, y, z), (x, y+1.0, z), (x+1.0, y+1.0, z)],
+            uv_coords: uv,
+            texture: texture.to_string(),
+            face_dir: crate::mc_models::FaceDirection::North,
+            tint_index: -1,
+        },
+        // Top (y+)
+        GeneratedQuad {
+            vertices: [(x, y+1.0, z+1.0), (x+1.0, y+1.0, z+1.0), (x+1.0, y+1.0, z), (x, y+1.0, z)],
+            uv_coords: uv,
+            texture: texture.to_string(),
+            face_dir: crate::mc_models::FaceDirection::Up,
+            tint_index: -1,
+        },
+        // Bottom (y-)
+        GeneratedQuad {
+            vertices: [(x, y, z), (x+1.0, y, z), (x+1.0, y, z+1.0), (x, y, z+1.0)],
+            uv_coords: uv,
+            texture: texture.to_string(),
+            face_dir: crate::mc_models::FaceDirection::Down,
+            tint_index: -1,
+        },
+        // Right (x+)
+        GeneratedQuad {
+            vertices: [(x+1.0, y, z+1.0), (x+1.0, y, z), (x+1.0, y+1.0, z), (x+1.0, y+1.0, z+1.0)],
+            uv_coords: uv,
+            texture: texture.to_string(),
+            face_dir: crate::mc_models::FaceDirection::East,
+            tint_index: -1,
+        },
+        // Left (x-)
+        GeneratedQuad {
+            vertices: [(x, y, z), (x, y, z+1.0), (x, y+1.0, z+1.0), (x, y+1.0, z)],
+            uv_coords: uv,
+            texture: texture.to_string(),
+            face_dir: crate::mc_models::FaceDirection::West,
+            tint_index: -1,
+        },
+    ]
 }
 
 /// Check if block at (x, y, z) has any neighbor that is air or transparent
 fn is_exposed(schematic: &UnifiedSchematic, x: usize, y: usize, z: usize, w: usize, h: usize, l: usize) -> bool {
-    // Edge blocks are always exposed
     if x == 0 || x == w - 1 || y == 0 || y == h - 1 || z == 0 || z == l - 1 {
         return true;
     }
@@ -220,130 +335,10 @@ fn is_exposed(schematic: &UnifiedSchematic, x: usize, y: usize, z: usize, w: usi
     false
 }
 
-/// Generate a simple cube mesh (1x1x1 at origin)
-fn generate_cube_mesh(material: &str) -> BlockMesh {
-    // 8 vertices of a unit cube
-    let positions = vec![
-        // Front face (z+)
-        0.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 1.0, 1.0,  0.0, 1.0, 1.0,
-        // Back face (z-)
-        1.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 1.0, 0.0,  1.0, 1.0, 0.0,
-        // Top face (y+)
-        0.0, 1.0, 1.0,  1.0, 1.0, 1.0,  1.0, 1.0, 0.0,  0.0, 1.0, 0.0,
-        // Bottom face (y-)
-        0.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 1.0,  0.0, 0.0, 1.0,
-        // Right face (x+)
-        1.0, 0.0, 1.0,  1.0, 0.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 1.0,
-        // Left face (x-)
-        0.0, 0.0, 0.0,  0.0, 0.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 0.0,
-    ];
-
-    let normals = vec![
-        // Front
-        0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
-        // Back
-        0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0,
-        // Top
-        0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
-        // Bottom
-        0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0,
-        // Right
-        1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
-        // Left
-        -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0,
-    ];
-
-    let uvs = vec![
-        // Each face gets 0-1 UV mapping
-        0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0, // Front
-        0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0, // Back
-        0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0, // Top
-        0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0, // Bottom
-        0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0, // Right
-        0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0, // Left
-    ];
-
-    // Two triangles per face, 6 faces
-    let indices = vec![
-        0, 1, 2, 0, 2, 3,       // Front
-        4, 5, 6, 4, 6, 7,       // Back
-        8, 9, 10, 8, 10, 11,    // Top
-        12, 13, 14, 12, 14, 15, // Bottom
-        16, 17, 18, 16, 18, 19, // Right
-        20, 21, 22, 20, 22, 23, // Left
-    ];
-
-    BlockMesh {
-        positions,
-        normals,
-        uvs,
-        indices,
-        material: material.to_string(),
-    }
-}
-
-/// Generate mesh from quads (for JSON model blocks)
-fn generate_mesh_from_quads(quads: &[GeneratedQuad], material: &str) -> BlockMesh {
-    let mut positions = Vec::new();
-    let mut normals = Vec::new();
-    let mut uvs = Vec::new();
-    let mut indices = Vec::new();
-
-    for quad in quads {
-        let base_idx = (positions.len() / 3) as u32;
-
-        // Add 4 vertices
-        for (i, v) in quad.vertices.iter().enumerate() {
-            positions.extend_from_slice(&[v.0, v.1, v.2]);
-
-            // Compute normal from first 3 vertices
-            if i == 0 {
-                let v0 = quad.vertices[0];
-                let v1 = quad.vertices[1];
-                let v2 = quad.vertices[2];
-                let e1 = (v1.0 - v0.0, v1.1 - v0.1, v1.2 - v0.2);
-                let e2 = (v2.0 - v0.0, v2.1 - v0.1, v2.2 - v0.2);
-                let n = (
-                    e1.1 * e2.2 - e1.2 * e2.1,
-                    e1.2 * e2.0 - e1.0 * e2.2,
-                    e1.0 * e2.1 - e1.1 * e2.0,
-                );
-                let len = (n.0 * n.0 + n.1 * n.1 + n.2 * n.2).sqrt();
-                let normal = if len > 0.0 {
-                    (n.0 / len, n.1 / len, n.2 / len)
-                } else {
-                    (0.0, 1.0, 0.0)
-                };
-                // Add normal 4 times (once per vertex)
-                for _ in 0..4 {
-                    normals.extend_from_slice(&[normal.0, normal.1, normal.2]);
-                }
-            }
-
-            uvs.extend_from_slice(&[quad.uv_coords[i].0, 1.0 - quad.uv_coords[i].1]);
-        }
-
-        // Two triangles for quad
-        indices.extend_from_slice(&[
-            base_idx, base_idx + 1, base_idx + 2,
-            base_idx, base_idx + 2, base_idx + 3,
-        ]);
-    }
-
-    BlockMesh {
-        positions,
-        normals,
-        uvs,
-        indices,
-        material: material.to_string(),
-    }
-}
-
-/// Get block color for material
+/// Get block color for material (returns [r, g, b, a])
 fn get_block_color(name: &str) -> [f32; 4] {
     let name = name.strip_prefix("minecraft:").unwrap_or(name);
 
-    // Extract color from block name
     let (r, g, b) = if name.contains("white") {
         (0.95, 0.95, 0.95)
     } else if name.contains("orange") {
@@ -398,7 +393,6 @@ fn get_block_color(name: &str) -> [f32; 4] {
         (0.6, 0.6, 0.6)
     };
 
-    // Alpha for transparent blocks
     let a = if name.contains("glass") || name.contains("water") || name.contains("ice") {
         0.6
     } else {
@@ -408,326 +402,531 @@ fn get_block_color(name: &str) -> [f32; 4] {
     [r, g, b, a]
 }
 
-/// Export schematic to GLB format with instancing
+/// Sanitize texture path to material name (same as OBJ export)
+fn texture_to_mat_name(texture: &str) -> String {
+    let s = texture.strip_prefix("minecraft:").unwrap_or(texture);
+    let s = s.strip_prefix("block/").unwrap_or(s);
+    s.replace(['/', ':'], "_")
+}
+
+/// Apply color tint to PNG image bytes in memory
+fn apply_tint_in_memory(png_bytes: &[u8], tint: (f32, f32, f32)) -> Option<Vec<u8>> {
+    use image::{ImageFormat, GenericImageView};
+
+    let img = image::load_from_memory_with_format(png_bytes, ImageFormat::Png).ok()?;
+    let (w, h) = img.dimensions();
+    let mut buf = image::ImageBuffer::new(w, h);
+
+    for (x, y, pixel) in img.pixels() {
+        let r = (pixel[0] as f32 * tint.0).min(255.0) as u8;
+        let g = (pixel[1] as f32 * tint.1).min(255.0) as u8;
+        let b = (pixel[2] as f32 * tint.2).min(255.0) as u8;
+        buf.put_pixel(x, y, image::Rgba([r, g, b, pixel[3]]));
+    }
+
+    let mut out = std::io::Cursor::new(Vec::new());
+    buf.write_to(&mut out, ImageFormat::Png).ok()?;
+    Some(out.into_inner())
+}
+
+/// Check if a texture name needs foliage/grass tinting
+fn needs_tint(name: &str) -> Option<(f32, f32, f32)> {
+    let grass_tint = (0.44, 0.64, 0.22);
+    let foliage_tint = (0.38, 0.60, 0.18);
+
+    if name.contains("grass") && !name.contains("dead") {
+        Some(grass_tint)
+    } else if name.contains("fern") && !name.contains("dead") {
+        Some(grass_tint)
+    } else if name.ends_with("_leaves") || name == "leaves" {
+        if name.contains("spruce") {
+            Some((0.38, 0.51, 0.38))
+        } else if name.contains("birch") {
+            Some((0.50, 0.63, 0.33))
+        } else {
+            Some(foliage_tint)
+        }
+    } else {
+        None
+    }
+}
+
+/// Check if material represents a translucent block (smooth alpha blending)
+/// vs cutout (binary alpha from texture)
+fn is_translucent_material(name: &str) -> bool {
+    name.contains("glass") || name.contains("water") || name.contains("ice")
+        || name.contains("slime") || name.contains("honey")
+}
+
+/// Export schematic to GLB format with explicit geometry (like OBJ export)
 pub fn export_glb<P: AsRef<Path>>(
     schematic: &UnifiedSchematic,
     output_path: P,
     jar_path: Option<&Path>,
-    _textures: Option<&TextureManager>,
+    textures: Option<&TextureManager>,
     hollow: bool,
     resource_pack: Option<&Path>,
 ) -> std::io::Result<()> {
     let output_path = output_path.as_ref();
 
+    // Warn if output path doesn't have .glb extension
+    match output_path.extension().and_then(|e| e.to_str()) {
+        Some("glb") => {}
+        Some(ext) => {
+            eprintln!("Warning: Output file has .{} extension, but GLB format requires .glb", ext);
+            eprintln!("  Consider: --output {}.glb", output_path.file_stem().unwrap_or_default().to_string_lossy());
+        }
+        None => {
+            eprintln!("Warning: Output file has no extension. GLB files should use .glb extension.");
+        }
+    }
+
     let (w, h, l) = (schematic.width as usize, schematic.height as usize, schematic.length as usize);
-    let total_blocks = (w * h * l) as u64;
-
-    // Phase 1: Collect unique block types and their positions
-    let pb = create_progress_bar(total_blocks, "Collecting blocks");
-
-    // Map: block_key -> (mesh_data, positions)
-    let mut block_types: HashMap<String, (Option<BlockMesh>, Vec<[f32; 3]>)> = HashMap::new();
 
     // Load model manager if jar provided
     let mut model_manager = jar_path.and_then(|p| {
-        ModelManager::from_jar_with_resource_pack(p, resource_pack).ok()
+        match ModelManager::from_jar_with_resource_pack(p, resource_pack) {
+            Ok(mm) => Some(mm),
+            Err(e) => {
+                eprintln!("Warning: Failed to load models from jar: {}", e);
+                eprintln!("  Falling back to simple cube geometry.");
+                None
+            }
+        }
     });
 
-    let mut processed = 0u64;
-    for y in 0..h {
-        for z in 0..l {
-            for x in 0..w {
-                processed += 1;
-                if processed % 100_000 == 0 {
-                    pb.set_position(processed);
-                }
+    // Phase 1: Generate all geometry at actual world positions, grouped by material
+    // Process in Y-layer chunks to limit peak memory (same as OBJ export)
+    const CHUNK_SIZE: usize = 16;
+    let num_chunks = (h + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    let pb = create_progress_bar(num_chunks as u64, "Generating geometry");
 
-                let Some(block) = schematic.get_block(x as u16, y as u16, z as u16) else { continue };
-                if block.is_air() { continue; }
+    // material_name -> accumulated geometry
+    let mut material_geom: HashMap<String, MaterialGeometry> = HashMap::new();
+    // material_name -> (color, texture_lookup_key for TextureManager)
+    // texture_lookup_key is the RAW name (e.g. "oak_planks"), NOT sanitized with _ replacements
+    let mut material_info: HashMap<String, ([f32; 4], Option<String>)> = HashMap::new();
+    let mut total_quads = 0usize;
+    let mut skipped_no_model = 0usize;
+    let mut skipped_resolve_fail = 0usize;
 
-                // Skip unexposed blocks if hollow mode
-                if hollow && !is_exposed(schematic, x, y, z, w, h, l) {
-                    continue;
-                }
+    // Helper: add a quad to a material's geometry
+    let add_quad = |mat_name: &str, tex_lookup: Option<&str>, block_name: &str,
+                    quad: &GeneratedQuad,
+                    material_geom: &mut HashMap<String, MaterialGeometry>,
+                    material_info: &mut HashMap<String, ([f32; 4], Option<String>)>,
+                    total_quads: &mut usize| {
+        material_info.entry(mat_name.to_string()).or_insert_with(|| {
+            let color = get_block_color(block_name);
+            (color, tex_lookup.map(|s| s.to_string()))
+        });
+        let geom = material_geom.entry(mat_name.to_string()).or_insert_with(MaterialGeometry::new);
+        geom.append_quad(quad);
+        *total_quads += 1;
+    };
 
-                // Create key from block name + relevant properties
-                let key = block.display_name();
-                let position = [x as f32, y as f32, z as f32];
+    for chunk_idx in 0..num_chunks {
+        pb.set_position(chunk_idx as u64);
 
-                let entry = block_types.entry(key.to_string()).or_insert_with(|| (None, Vec::new()));
-                entry.1.push(position);
+        let y_start = chunk_idx * CHUNK_SIZE;
+        let y_end = ((chunk_idx + 1) * CHUNK_SIZE).min(h);
 
-                // Generate mesh on first encounter
-                if entry.0.is_none() {
-                    let mesh = if let Some(ref mut mm) = model_manager {
-                        // Try to get model from JSON
+        for y in y_start..y_end {
+            for z in 0..l {
+                for x in 0..w {
+                    let Some(block) = schematic.get_block(x as u16, y as u16, z as u16) else { continue };
+                    if block.is_air() { continue; }
+
+                    let xf = x as f32;
+                    let yf = y as f32;
+                    let zf = z as f32;
+
+                    // === Water/lava handling (matches OBJ exactly) ===
+                    let is_water_block = block.name == "minecraft:water" || block.name == "water";
+                    let is_lava_block = block.name == "minecraft:lava" || block.name == "lava";
+                    let is_water_cauldron = block.name == "minecraft:water_cauldron";
+                    let is_lava_cauldron = block.name == "minecraft:lava_cauldron";
+
+                    // Register water material if needed
+                    if is_water_block || is_water_cauldron || crate::export3d::is_waterlogged(&block.state.properties) {
+                        material_info.entry("water_still".to_string()).or_insert_with(|| {
+                            ([0.2, 0.4, 0.8, 0.6], Some("water_still".to_string()))
+                        });
+                    }
+                    if is_lava_block || is_lava_cauldron {
+                        material_info.entry("lava_still".to_string()).or_insert_with(|| {
+                            ([0.9, 0.45, 0.1, 0.95], Some("lava_still".to_string()))
+                        });
+                    }
+
+                    // Generate water block geometry
+                    if is_water_block {
+                        let water_quads = crate::export3d::generate_water_quads_culled(x, y, z, schematic, w, h, l);
+                        for quad in &water_quads {
+                            let geom = material_geom.entry("water_still".to_string()).or_insert_with(MaterialGeometry::new);
+                            geom.append_quad(quad);
+                            total_quads += 1;
+                        }
+                        continue;
+                    }
+
+                    // Generate lava block geometry
+                    if is_lava_block {
+                        let lava_quads = crate::export3d::generate_lava_quads_culled(x, y, z, schematic, w, h, l);
+                        for quad in &lava_quads {
+                            let geom = material_geom.entry("lava_still".to_string()).or_insert_with(MaterialGeometry::new);
+                            geom.append_quad(quad);
+                            total_quads += 1;
+                        }
+                        continue;
+                    }
+
+                    // Handle cauldrons with liquids
+                    if is_water_cauldron || is_lava_cauldron {
+                        let level: u8 = block.state.properties
+                            .get("level")
+                            .and_then(|v| v.parse().ok())
+                            .unwrap_or(3);
+                        if level > 0 {
+                            let liquid_quads = crate::export3d::generate_cauldron_liquid_quads(
+                                xf, yf, zf, level, is_lava_cauldron,
+                            );
+                            let mat_name = if is_lava_cauldron { "lava_still" } else { "water_still" };
+                            for quad in &liquid_quads {
+                                let geom = material_geom.entry(mat_name.to_string()).or_insert_with(MaterialGeometry::new);
+                                geom.append_quad(quad);
+                                total_quads += 1;
+                            }
+                        }
+                        // Fall through to render the cauldron model itself
+                    }
+
+                    // === Model-based rendering ===
+                    if let Some(ref mut mm) = model_manager {
                         let model_refs = mm.get_models_for_block(&block.name, &block.state.properties);
-                        if !model_refs.is_empty() {
-                            let mut all_quads = Vec::new();
-                            for (model_ref, _) in &model_refs {
-                                if let Some(resolved) = mm.resolve_model(&model_ref.model) {
-                                    let quads = crate::mc_models::generate_model_quads(
-                                        &resolved,
-                                        model_ref.x,
-                                        model_ref.y,
-                                        0.0, 0.0, 0.0, // Relative to origin
-                                    );
-                                    all_quads.extend(quads);
-                                }
+
+                        if model_refs.is_empty() {
+                            skipped_no_model += 1;
+                            continue;
+                        }
+
+                        for (model_ref, _) in &model_refs {
+                            let Some(resolved) = mm.resolve_model(&model_ref.model) else {
+                                skipped_resolve_fail += 1;
+                                continue;
+                            };
+
+                            let quads = crate::mc_models::generate_model_quads(
+                                &resolved,
+                                model_ref.x,
+                                model_ref.y,
+                                xf, yf, zf,
+                            );
+
+                            for quad in &quads {
+                                let mat_name = texture_to_mat_name(&quad.texture);
+                                // Use ORIGINAL texture path for TextureManager lookup (not sanitized)
+                                let s = quad.texture.strip_prefix("minecraft:").unwrap_or(&quad.texture);
+                                let tex_lookup = s.strip_prefix("block/").unwrap_or(s);
+
+                                add_quad(&mat_name, Some(tex_lookup), &block.name, quad,
+                                         &mut material_geom, &mut material_info, &mut total_quads);
                             }
-                            if !all_quads.is_empty() {
-                                Some(generate_mesh_from_quads(&all_quads, &key))
-                            } else {
-                                Some(generate_cube_mesh(&key))
+                        }
+
+                        // Waterlogged blocks: add water overlay (matches OBJ)
+                        if crate::export3d::is_waterlogged(&block.state.properties) {
+                            let water_quads = crate::export3d::generate_water_quads_culled(x, y, z, schematic, w, h, l);
+                            for quad in &water_quads {
+                                let geom = material_geom.entry("water_still".to_string()).or_insert_with(MaterialGeometry::new);
+                                geom.append_quad(quad);
+                                total_quads += 1;
                             }
-                        } else {
-                            Some(generate_cube_mesh(&key))
                         }
                     } else {
-                        Some(generate_cube_mesh(&key))
-                    };
-                    entry.0 = mesh;
+                        // No model manager — all cubes (hollow only applies here, like OBJ)
+                        if hollow && !is_exposed(schematic, x, y, z, w, h, l) {
+                            continue;
+                        }
+                        let mat_name = block.display_name().replace([':', '[', ']', '=', ','], "_");
+                        let tex_lookup_key = textures.and_then(|tm| {
+                            let lookup = block.name.strip_prefix("minecraft:").unwrap_or(&block.name);
+                            tm.get_texture(lookup)
+                                .map(|p| p.file_stem().unwrap().to_string_lossy().to_string())
+                        });
+
+                        material_info.entry(mat_name.clone()).or_insert_with(|| {
+                            let color = get_block_color(&block.name);
+                            (color, tex_lookup_key.clone())
+                        });
+
+                        let cube_quads = generate_cube_quads(xf, yf, zf, &mat_name);
+                        let geom = material_geom.entry(mat_name).or_insert_with(MaterialGeometry::new);
+                        for quad in &cube_quads {
+                            geom.append_quad(quad);
+                            total_quads += 1;
+                        }
+                    }
                 }
             }
         }
     }
-    pb.finish_with_message(format!("Found {} unique block types", block_types.len()));
+    pb.finish_with_message(format!("Generated {} quads, {} materials", total_quads, material_geom.len()));
+    if skipped_no_model > 0 {
+        eprintln!("  Note: {} blocks had no model definition (skipped)", skipped_no_model);
+    }
+    if skipped_resolve_fail > 0 {
+        eprintln!("  Warning: {} model references failed to resolve", skipped_resolve_fail);
+    }
 
-    // Phase 2: Build glTF structure
-    let pb = create_progress_bar(block_types.len() as u64, "Building GLB");
-
+    // Phase 2: Build binary buffer — embed textures first, then geometry
     let mut binary_data: Vec<u8> = Vec::new();
     let mut buffer_views: Vec<GltfBufferView> = Vec::new();
     let mut accessors: Vec<GltfAccessor> = Vec::new();
-    let mut meshes: Vec<GltfMesh> = Vec::new();
-    let mut nodes: Vec<GltfNode> = Vec::new();
-    let mut materials: Vec<GltfMaterial> = Vec::new();
-    let mut material_map: HashMap<String, usize> = HashMap::new();
+    let mut gltf_images: Vec<GltfImage> = Vec::new();
+    let mut gltf_samplers: Vec<GltfSampler> = Vec::new();
+    let mut gltf_textures: Vec<GltfTexture> = Vec::new();
+    let mut texture_name_to_tex_idx: HashMap<String, usize> = HashMap::new();
 
-    let mut mesh_idx = 0usize;
-    for (i, (key, (mesh_opt, positions))) in block_types.iter().enumerate() {
-        pb.set_position(i as u64);
-
-        let Some(mesh) = mesh_opt else { continue };
-        if positions.is_empty() { continue; }
-
-        // Get or create material
-        let material_idx = if let Some(&idx) = material_map.get(&mesh.material) {
-            idx
-        } else {
-            let color = get_block_color(&mesh.material);
-            let alpha_mode = if color[3] < 1.0 { Some("BLEND".to_string()) } else { None };
-            let mat = GltfMaterial {
-                name: mesh.material.clone(),
-                pbr: GltfPbr {
-                    base_color_factor: color,
-                    metallic_factor: 0.0,
-                    roughness_factor: 0.8,
-                },
-                alpha_mode,
-                double_sided: true,
-            };
-            let idx = materials.len();
-            materials.push(mat);
-            material_map.insert(mesh.material.clone(), idx);
-            idx
-        };
-
-        // Write mesh data to binary buffer
-        let positions_start = binary_data.len();
-        for &v in &mesh.positions {
-            binary_data.extend_from_slice(&v.to_le_bytes());
-        }
-        // Pad to 4-byte boundary
-        while binary_data.len() % 4 != 0 {
-            binary_data.push(0);
-        }
-        let positions_len = binary_data.len() - positions_start;
-
-        let normals_start = binary_data.len();
-        for &n in &mesh.normals {
-            binary_data.extend_from_slice(&n.to_le_bytes());
-        }
-        while binary_data.len() % 4 != 0 {
-            binary_data.push(0);
-        }
-        let normals_len = binary_data.len() - normals_start;
-
-        let uvs_start = binary_data.len();
-        for &uv in &mesh.uvs {
-            binary_data.extend_from_slice(&uv.to_le_bytes());
-        }
-        while binary_data.len() % 4 != 0 {
-            binary_data.push(0);
-        }
-        let uvs_len = binary_data.len() - uvs_start;
-
-        let indices_start = binary_data.len();
-        for &idx in &mesh.indices {
-            binary_data.extend_from_slice(&idx.to_le_bytes());
-        }
-        while binary_data.len() % 4 != 0 {
-            binary_data.push(0);
-        }
-        let indices_len = binary_data.len() - indices_start;
-
-        // Compute position bounds
-        let mut min_pos = [f32::MAX; 3];
-        let mut max_pos = [f32::MIN; 3];
-        for chunk in mesh.positions.chunks(3) {
-            for i in 0..3 {
-                min_pos[i] = min_pos[i].min(chunk[i]);
-                max_pos[i] = max_pos[i].max(chunk[i]);
+    if textures.is_some() {
+        // Collect unique texture names
+        let mut unique_tex: Vec<String> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for (_, (_, tex_name)) in &material_info {
+            if let Some(tn) = tex_name {
+                if seen.insert(tn.clone()) {
+                    unique_tex.push(tn.clone());
+                }
             }
         }
 
-        // Create buffer views and accessors for mesh data
-        let pos_view_idx = buffer_views.len();
+        if !unique_tex.is_empty() {
+            let tm = textures.unwrap();
+            eprintln!("Embedding {} textures...", unique_tex.len());
+
+            gltf_samplers.push(GltfSampler {
+                mag_filter: GLTF_NEAREST,
+                min_filter: GLTF_NEAREST,
+                wrap_s: GLTF_REPEAT,
+                wrap_t: GLTF_REPEAT,
+            });
+
+            let mut missing_textures: Vec<String> = Vec::new();
+            for tex_name in &unique_tex {
+                let png_path = tm.get_texture(tex_name);
+                if png_path.is_none() {
+                    missing_textures.push(tex_name.clone());
+                }
+                let png_bytes = png_path.and_then(|p| std::fs::read(p).ok());
+
+                if let Some(mut bytes) = png_bytes {
+                    if let Some(tint) = needs_tint(tex_name) {
+                        if let Some(tinted) = apply_tint_in_memory(&bytes, tint) {
+                            bytes = tinted;
+                        }
+                    }
+
+                    let start = binary_data.len();
+                    let byte_length = bytes.len();
+                    binary_data.extend_from_slice(&bytes);
+                    while binary_data.len() % 4 != 0 { binary_data.push(0); }
+
+                    let bv_idx = buffer_views.len();
+                    buffer_views.push(GltfBufferView {
+                        buffer: 0, byte_offset: start, byte_length,
+                        byte_stride: None, target: None,
+                    });
+
+                    let img_idx = gltf_images.len();
+                    gltf_images.push(GltfImage {
+                        buffer_view: bv_idx,
+                        mime_type: "image/png".to_string(),
+                    });
+
+                    let tex_idx = gltf_textures.len();
+                    gltf_textures.push(GltfTexture { source: img_idx, sampler: 0 });
+
+                    texture_name_to_tex_idx.insert(tex_name.clone(), tex_idx);
+                }
+            }
+            eprintln!("  Embedded {} textures into GLB", texture_name_to_tex_idx.len());
+            if !missing_textures.is_empty() {
+                eprintln!("  Warning: {} textures not found:", missing_textures.len());
+                for name in missing_textures.iter().take(20) {
+                    eprintln!("    - {}", name);
+                }
+                if missing_textures.len() > 20 {
+                    eprintln!("    ... and {} more", missing_textures.len() - 20);
+                }
+            }
+        }
+    }
+
+    // Phase 3: Write geometry per material, create glTF meshes
+    let pb = create_progress_bar(material_geom.len() as u64, "Building GLB");
+
+    let mut meshes: Vec<GltfMesh> = Vec::new();
+    let mut nodes: Vec<GltfNode> = Vec::new();
+    let mut materials_gltf: Vec<GltfMaterial> = Vec::new();
+
+    let mut sorted_materials: Vec<_> = material_geom.into_iter().collect();
+    sorted_materials.sort_by(|a, b| a.0.cmp(&b.0));
+
+    for (i, (mat_name, geom)) in sorted_materials.into_iter().enumerate() {
+        pb.set_position(i as u64);
+
+        if geom.positions.is_empty() { continue; }
+
+        // Determine color and texture for this material
+        let (color, tex_name) = material_info.get(&mat_name)
+            .cloned()
+            .unwrap_or(([0.6, 0.6, 0.6, 1.0], None));
+
+        let base_color_texture = tex_name.as_ref()
+            .and_then(|tn| texture_name_to_tex_idx.get(tn))
+            .map(|&idx| GltfTextureInfo { index: idx });
+
+        let base_color_factor = if base_color_texture.is_some() {
+            [1.0, 1.0, 1.0, color[3]]
+        } else {
+            color
+        };
+
+        // Determine alpha mode:
+        // - Textured glass/water/ice → BLEND (smooth transparency)
+        // - Other textured blocks → MASK (cutout for flowers, rails, etc.)
+        // - Non-textured glass/water/ice → BLEND
+        // - Fully opaque → no alpha mode (OPAQUE)
+        let has_texture = base_color_texture.is_some();
+        let is_translucent = is_translucent_material(&mat_name);
+        let (alpha_mode, alpha_cutoff) = if is_translucent {
+            (Some("BLEND".to_string()), None)
+        } else if has_texture {
+            // Use MASK for all textured non-translucent blocks
+            // Fully opaque textures pass cutoff test on all pixels (alpha=1.0 > 0.5)
+            // Flowers/plants/etc get transparent pixels clipped (alpha=0.0 < 0.5)
+            (Some("MASK".to_string()), Some(0.5))
+        } else if color[3] < 1.0 {
+            (Some("BLEND".to_string()), None)
+        } else {
+            (None, None)
+        };
+
+        let material_idx = materials_gltf.len();
+        materials_gltf.push(GltfMaterial {
+            name: mat_name.clone(),
+            pbr: GltfPbr {
+                base_color_factor,
+                metallic_factor: 0.0,
+                roughness_factor: 0.8,
+                base_color_texture,
+            },
+            alpha_mode,
+            alpha_cutoff,
+            double_sided: true,
+        });
+
+        // Write positions
+        let pos_start = binary_data.len();
+        for &v in &geom.positions { binary_data.extend_from_slice(&v.to_le_bytes()); }
+        while binary_data.len() % 4 != 0 { binary_data.push(0); }
+        let pos_len = binary_data.len() - pos_start;
+
+        // Write normals
+        let norm_start = binary_data.len();
+        for &n in &geom.normals { binary_data.extend_from_slice(&n.to_le_bytes()); }
+        while binary_data.len() % 4 != 0 { binary_data.push(0); }
+        let norm_len = binary_data.len() - norm_start;
+
+        // Write UVs
+        let uv_start = binary_data.len();
+        for &uv in &geom.uvs { binary_data.extend_from_slice(&uv.to_le_bytes()); }
+        while binary_data.len() % 4 != 0 { binary_data.push(0); }
+        let uv_len = binary_data.len() - uv_start;
+
+        // Write indices
+        let idx_start = binary_data.len();
+        for &idx in &geom.indices { binary_data.extend_from_slice(&idx.to_le_bytes()); }
+        while binary_data.len() % 4 != 0 { binary_data.push(0); }
+        let idx_len = binary_data.len() - idx_start;
+
+        // Position bounds
+        let mut min_pos = [f32::MAX; 3];
+        let mut max_pos = [f32::MIN; 3];
+        for chunk in geom.positions.chunks(3) {
+            for j in 0..3 {
+                min_pos[j] = min_pos[j].min(chunk[j]);
+                max_pos[j] = max_pos[j].max(chunk[j]);
+            }
+        }
+
+        // Buffer views
+        let pos_bv = buffer_views.len();
         buffer_views.push(GltfBufferView {
-            buffer: 0,
-            byte_offset: positions_start,
-            byte_length: positions_len,
-            byte_stride: Some(12),
-            target: Some(GLTF_ARRAY_BUFFER),
+            buffer: 0, byte_offset: pos_start, byte_length: pos_len,
+            byte_stride: Some(12), target: Some(GLTF_ARRAY_BUFFER),
         });
-
-        let pos_accessor_idx = accessors.len();
-        accessors.push(GltfAccessor {
-            buffer_view: pos_view_idx,
-            byte_offset: 0,
-            component_type: GLTF_FLOAT,
-            count: mesh.positions.len() / 3,
-            accessor_type: "VEC3".to_string(),
-            min: Some(min_pos.to_vec()),
-            max: Some(max_pos.to_vec()),
-        });
-
-        let norm_view_idx = buffer_views.len();
+        let norm_bv = buffer_views.len();
         buffer_views.push(GltfBufferView {
-            buffer: 0,
-            byte_offset: normals_start,
-            byte_length: normals_len,
-            byte_stride: Some(12),
-            target: Some(GLTF_ARRAY_BUFFER),
+            buffer: 0, byte_offset: norm_start, byte_length: norm_len,
+            byte_stride: Some(12), target: Some(GLTF_ARRAY_BUFFER),
         });
-
-        let norm_accessor_idx = accessors.len();
-        accessors.push(GltfAccessor {
-            buffer_view: norm_view_idx,
-            byte_offset: 0,
-            component_type: GLTF_FLOAT,
-            count: mesh.normals.len() / 3,
-            accessor_type: "VEC3".to_string(),
-            min: None,
-            max: None,
-        });
-
-        let uv_view_idx = buffer_views.len();
+        let uv_bv = buffer_views.len();
         buffer_views.push(GltfBufferView {
-            buffer: 0,
-            byte_offset: uvs_start,
-            byte_length: uvs_len,
-            byte_stride: Some(8),
-            target: Some(GLTF_ARRAY_BUFFER),
+            buffer: 0, byte_offset: uv_start, byte_length: uv_len,
+            byte_stride: Some(8), target: Some(GLTF_ARRAY_BUFFER),
         });
-
-        let uv_accessor_idx = accessors.len();
-        accessors.push(GltfAccessor {
-            buffer_view: uv_view_idx,
-            byte_offset: 0,
-            component_type: GLTF_FLOAT,
-            count: mesh.uvs.len() / 2,
-            accessor_type: "VEC2".to_string(),
-            min: None,
-            max: None,
-        });
-
-        let idx_view_idx = buffer_views.len();
+        let idx_bv = buffer_views.len();
         buffer_views.push(GltfBufferView {
-            buffer: 0,
-            byte_offset: indices_start,
-            byte_length: indices_len,
-            byte_stride: None,
-            target: Some(GLTF_ELEMENT_ARRAY_BUFFER),
+            buffer: 0, byte_offset: idx_start, byte_length: idx_len,
+            byte_stride: None, target: Some(GLTF_ELEMENT_ARRAY_BUFFER),
         });
 
-        let idx_accessor_idx = accessors.len();
+        // Accessors
+        let pos_acc = accessors.len();
         accessors.push(GltfAccessor {
-            buffer_view: idx_view_idx,
-            byte_offset: 0,
-            component_type: GLTF_UNSIGNED_INT,
-            count: mesh.indices.len(),
-            accessor_type: "SCALAR".to_string(),
-            min: None,
-            max: None,
+            buffer_view: pos_bv, byte_offset: 0, component_type: GLTF_FLOAT,
+            count: geom.positions.len() / 3, accessor_type: "VEC3".to_string(),
+            min: Some(min_pos.to_vec()), max: Some(max_pos.to_vec()),
+        });
+        let norm_acc = accessors.len();
+        accessors.push(GltfAccessor {
+            buffer_view: norm_bv, byte_offset: 0, component_type: GLTF_FLOAT,
+            count: geom.normals.len() / 3, accessor_type: "VEC3".to_string(),
+            min: None, max: None,
+        });
+        let uv_acc = accessors.len();
+        accessors.push(GltfAccessor {
+            buffer_view: uv_bv, byte_offset: 0, component_type: GLTF_FLOAT,
+            count: geom.uvs.len() / 2, accessor_type: "VEC2".to_string(),
+            min: None, max: None,
+        });
+        let idx_acc = accessors.len();
+        accessors.push(GltfAccessor {
+            buffer_view: idx_bv, byte_offset: 0, component_type: GLTF_UNSIGNED_INT,
+            count: geom.indices.len(), accessor_type: "SCALAR".to_string(),
+            min: None, max: None,
         });
 
-        // Create mesh
+        // Create mesh + node
+        let mesh_idx = meshes.len();
         meshes.push(GltfMesh {
             primitives: vec![GltfPrimitive {
                 attributes: GltfAttributes {
-                    position: pos_accessor_idx,
-                    normal: Some(norm_accessor_idx),
-                    texcoord: Some(uv_accessor_idx),
+                    position: pos_acc,
+                    normal: Some(norm_acc),
+                    texcoord: Some(uv_acc),
                 },
-                indices: Some(idx_accessor_idx),
+                indices: Some(idx_acc),
                 material: Some(material_idx),
             }],
-            name: Some(key.clone()),
+            name: Some(mat_name),
         });
 
-        // Write instance translations
-        let translations_start = binary_data.len();
-        let mut min_trans = [f32::MAX; 3];
-        let mut max_trans = [f32::MIN; 3];
-        for pos in positions {
-            for i in 0..3 {
-                min_trans[i] = min_trans[i].min(pos[i]);
-                max_trans[i] = max_trans[i].max(pos[i]);
-            }
-            binary_data.extend_from_slice(&pos[0].to_le_bytes());
-            binary_data.extend_from_slice(&pos[1].to_le_bytes());
-            binary_data.extend_from_slice(&pos[2].to_le_bytes());
-        }
-        while binary_data.len() % 4 != 0 {
-            binary_data.push(0);
-        }
-        let translations_len = binary_data.len() - translations_start;
-
-        let trans_view_idx = buffer_views.len();
-        buffer_views.push(GltfBufferView {
-            buffer: 0,
-            byte_offset: translations_start,
-            byte_length: translations_len,
-            byte_stride: Some(12),
-            target: None, // Not a standard attribute target
-        });
-
-        let trans_accessor_idx = accessors.len();
-        accessors.push(GltfAccessor {
-            buffer_view: trans_view_idx,
-            byte_offset: 0,
-            component_type: GLTF_FLOAT,
-            count: positions.len(),
-            accessor_type: "VEC3".to_string(),
-            min: Some(min_trans.to_vec()),
-            max: Some(max_trans.to_vec()),
-        });
-
-        // Create node with instancing extension
         nodes.push(GltfNode {
             mesh: Some(mesh_idx),
-            extensions: Some(GltfNodeExtensions {
-                instancing: GltfInstancing {
-                    attributes: GltfInstancingAttributes {
-                        translation: trans_accessor_idx,
-                    },
-                },
-            }),
-            name: Some(key.clone()),
+            name: None,
         });
-
-        mesh_idx += 1;
     }
     pb.finish_with_message(format!("Created {} meshes", meshes.len()));
 
@@ -747,8 +946,10 @@ pub fn export_glb<P: AsRef<Path>>(
         buffers: vec![GltfBuffer {
             byte_length: binary_data.len(),
         }],
-        materials,
-        extensions_used: vec!["EXT_mesh_gpu_instancing".to_string()],
+        materials: materials_gltf,
+        images: gltf_images,
+        samplers: gltf_samplers,
+        textures: gltf_textures,
     };
 
     // Serialize JSON
@@ -764,34 +965,28 @@ pub fn export_glb<P: AsRef<Path>>(
     let bin_chunk_len = binary_data.len() + bin_padding;
 
     // Calculate total file size
-    let total_size = 12 + // GLB header
-        8 + json_chunk_len + // JSON chunk header + data
-        8 + bin_chunk_len; // BIN chunk header + data
+    let total_size = 12 + 8 + json_chunk_len + 8 + bin_chunk_len;
 
     // Write GLB file
     eprintln!("Writing GLB file ({:.1} MB)...", total_size as f64 / 1024.0 / 1024.0);
     let mut file = BufWriter::with_capacity(4 * 1024 * 1024, std::fs::File::create(output_path)?);
 
     // GLB header
-    file.write_all(b"glTF")?; // Magic
-    file.write_all(&2u32.to_le_bytes())?; // Version
-    file.write_all(&(total_size as u32).to_le_bytes())?; // Total length
+    file.write_all(b"glTF")?;
+    file.write_all(&2u32.to_le_bytes())?;
+    file.write_all(&(total_size as u32).to_le_bytes())?;
 
     // JSON chunk
-    file.write_all(&(json_chunk_len as u32).to_le_bytes())?; // Chunk length
-    file.write_all(&0x4E4F534Au32.to_le_bytes())?; // Chunk type: JSON
+    file.write_all(&(json_chunk_len as u32).to_le_bytes())?;
+    file.write_all(&0x4E4F534Au32.to_le_bytes())?;
     file.write_all(json_bytes)?;
-    for _ in 0..json_padding {
-        file.write_all(b" ")?; // JSON padding must be spaces
-    }
+    for _ in 0..json_padding { file.write_all(b" ")?; }
 
     // BIN chunk
-    file.write_all(&(bin_chunk_len as u32).to_le_bytes())?; // Chunk length
-    file.write_all(&0x004E4942u32.to_le_bytes())?; // Chunk type: BIN
+    file.write_all(&(bin_chunk_len as u32).to_le_bytes())?;
+    file.write_all(&0x004E4942u32.to_le_bytes())?;
     file.write_all(&binary_data)?;
-    for _ in 0..bin_padding {
-        file.write_all(&[0u8])?; // Binary padding must be zeros
-    }
+    for _ in 0..bin_padding { file.write_all(&[0u8])?; }
 
     file.flush()?;
 

@@ -515,7 +515,7 @@ impl ModelManager {
                                 result.push((model_ref.clone(), name.to_string()));
                             }
                             MultipartApply::Multiple(refs) => {
-                                if let Some(r) = refs.first() {
+                                for r in refs {
                                     result.push((r.clone(), name.to_string()));
                                 }
                             }

@@ -252,7 +252,7 @@ fn get_block_transparency(name: &str) -> f32 {
 }
 
 /// Check if a block is waterlogged
-fn is_waterlogged(properties: &std::collections::HashMap<String, String>) -> bool {
+pub(crate) fn is_waterlogged(properties: &std::collections::HashMap<String, String>) -> bool {
     properties.get("waterlogged").map(|v| v == "true").unwrap_or(false)
 }
 
@@ -301,7 +301,7 @@ fn neighbor_has_lava(
 }
 
 /// Generate lava quads with face culling
-fn generate_lava_quads_culled(
+pub(crate) fn generate_lava_quads_culled(
     x: usize, y: usize, z: usize,
     schematic: &UnifiedSchematic,
     w: usize, h: usize, l: usize,
@@ -393,7 +393,7 @@ fn generate_lava_quads_culled(
 
 /// Generate liquid quads inside a cauldron
 /// level: 1, 2, or 3 (full)
-fn generate_cauldron_liquid_quads(
+pub(crate) fn generate_cauldron_liquid_quads(
     x: f32, y: f32, z: f32,
     level: u8,
     is_lava: bool,
@@ -471,7 +471,7 @@ fn generate_cauldron_liquid_quads(
 }
 
 /// Generate water quads with face culling based on neighbors
-fn generate_water_quads_culled(
+pub(crate) fn generate_water_quads_culled(
     x: usize, y: usize, z: usize,
     schematic: &UnifiedSchematic,
     w: usize, h: usize, l: usize,
@@ -957,22 +957,16 @@ pub fn export_obj_with_models<P: AsRef<Path>>(
 
                     // Get unique textures from this model
                     for (_key, tex_path) in &resolved.textures {
-                        let mat_name = tex_path
-                            .strip_prefix("minecraft:")
-                            .unwrap_or(tex_path)
-                            .strip_prefix("block/")
-                            .unwrap_or(tex_path)
-                            .replace(['/', ':'], "_");
+                        let s = tex_path.strip_prefix("minecraft:").unwrap_or(tex_path);
+                        let s = s.strip_prefix("block/").unwrap_or(s);
+                        let mat_name = s.replace(['/', ':'], "_");
 
                         if !materials.contains_key(&mat_name) {
                             let color = get_block_color(&block.name);
                             let opacity = get_block_transparency(&block.name);
                             let texture_file = if let (Some(tex_mgr), Some(tex_out_dir)) = (textures, &tex_dir) {
-                                let tex_lookup = tex_path
-                                    .strip_prefix("minecraft:")
-                                    .unwrap_or(tex_path)
-                                    .strip_prefix("block/")
-                                    .unwrap_or(tex_path);
+                                let s2 = tex_path.strip_prefix("minecraft:").unwrap_or(tex_path);
+                                let tex_lookup = s2.strip_prefix("block/").unwrap_or(s2);
 
                                 if let Some(src_path) = tex_mgr.get_texture(tex_lookup) {
                                     let tex_name = format!("{}.png", mat_name);
@@ -1123,11 +1117,8 @@ pub fn export_obj_with_models<P: AsRef<Path>>(
                         );
 
                         for quad in quads {
-                            let mat_name = quad.texture
-                                .strip_prefix("minecraft:")
-                                .unwrap_or(&quad.texture)
-                                .strip_prefix("block/")
-                                .unwrap_or(&quad.texture)
+                            let s = quad.texture.strip_prefix("minecraft:").unwrap_or(&quad.texture);
+                            let mat_name = s.strip_prefix("block/").unwrap_or(s)
                                 .replace(['/', ':'], "_");
 
                             chunk_quads.push((quad, mat_name));
